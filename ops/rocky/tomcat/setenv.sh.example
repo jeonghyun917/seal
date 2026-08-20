@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -eu
+
+: "${SEAL_DB_URL:?SEAL_DB_URL is required}"
+: "${SEAL_DB_USERNAME:?SEAL_DB_USERNAME is required}"
+: "${SEAL_DB_PASSWORD:?SEAL_DB_PASSWORD is required}"
+: "${SEAL_ADMIN_USERNAME:?SEAL_ADMIN_USERNAME is required}"
+: "${SEAL_ADMIN_PASSWORD:?SEAL_ADMIN_PASSWORD is required}"
+: "${SEAL_MAIL_FROM_ADDRESS:?SEAL_MAIL_FROM_ADDRESS is required}"
+
+export SPRING_PROFILES_ACTIVE="prod"
+export SEAL_MAIL_ENABLED="true"
+export SEAL_SMTP_HOST="relay.govkorea.com"
+export SEAL_SMTP_PORT="465"
+export SEAL_MAIL_FROM_NAME="개인정보 동의 안내"
+export SEAL_LOG_PATH="/var/log/seal"
+
+export CATALINA_OPTS="${CATALINA_OPTS:-} -Xms1024m -Xmx2048m -XX:+UseG1GC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Seoul"

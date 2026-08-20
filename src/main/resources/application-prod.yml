@@ -1,0 +1,28 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SEAL_DB_URL}
+    username: ${SEAL_DB_USERNAME}
+    password: ${SEAL_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${SEAL_DB_POOL_MAX:20}
+      minimum-idle: ${SEAL_DB_POOL_MIN:5}
+  security:
+    user:
+      name: ${SEAL_ADMIN_USERNAME}
+      password: ${SEAL_ADMIN_PASSWORD}
+      roles: ADMIN
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+
+seal:
+  mail:
+    enabled: true
+    from-address: ${SEAL_MAIL_FROM_ADDRESS}
+    from-name: ${SEAL_MAIL_FROM_NAME:개인정보 동의 안내}

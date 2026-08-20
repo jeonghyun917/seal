@@ -1,0 +1,30 @@
+# Build outputs
+target/
+*.class
+
+# IDE
+.idea/
+.project
+.classpath
+.settings/
+.vscode/
+*.iml
+
+# Runtime and local configuration
+logs/
+*.log
+.env
+.env.*
+!.env.example
+application-secret.yml
+src/main/resources/application-secret.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Existing generated document scratch files
+.tmp/
+docs/*.tmp
+docs/*.bin
+docs/.render_*/

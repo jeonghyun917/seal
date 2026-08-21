@@ -4,8 +4,7 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="kr.or.arte.seal.admin.persistence.organization.OrganizationMapper">
 
-    <select id="findVisibleOrganizations"
-            resultType="kr.or.arte.seal.admin.application.organization.OrganizationSummary">
+    <sql id="visibleOrganizationScope">
         WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
             SELECT scope_target_id, include_descendants
               FROM seal.user_scope
@@ -18,6 +17,11 @@
                 ON child.parent_id = parent_scope.organization_unit_id
              WHERE parent_scope.include_descendants = TRUE
         )
+    </sql>
+
+    <select id="findVisibleOrganizations"
+            resultType="kr.or.arte.seal.admin.application.organization.OrganizationSummary">
+        <include refid="visibleOrganizationScope"/>
         SELECT DISTINCT organization.organization_unit_id,
                organization.organization_code,
                organization.organization_name,
@@ -32,4 +36,71 @@
             ON parent.organization_unit_id = organization.parent_id
          ORDER BY organization.root_unit DESC, organization.organization_code
     </select>
+
+    <select id="findVisibleOrganization"
+            resultType="kr.or.arte.seal.admin.application.organization.OrganizationDetail">
+        <include refid="visibleOrganizationScope"/>
+        SELECT organization.organization_unit_id,
+               organization.organization_code,
+               organization.organization_name,
+               organization.parent_id,
+               parent.organization_name AS parent_organization_name,
+               organization.root_unit,
+               organization.active,
+               organization.version_no
+          FROM visible_scope scope
+          JOIN seal.organization_unit organization
+            ON organization.organization_unit_id = scope.organization_unit_id
+          LEFT JOIN seal.organization_unit parent
+            ON parent.organization_unit_id = organization.parent_id
+         WHERE organization.organization_unit_id = #{organizationUnitId}
+    </select>
+
+    <select id="canAccessOrganization" resultType="boolean">
+        <include refid="visibleOrganizationScope"/>
+        SELECT EXISTS (SELECT 1 FROM visible_scope WHERE organization_unit_id = #{organizationUnitId})
+    </select>
+
+    <insert id="insert">
+        INSERT INTO seal.organization_unit (organization_unit_id, organization_code,
+            organization_name, parent_id, root_unit, active)
+        VALUES (#{organizationUnitId}, #{organizationCode}, #{organizationName},
+            #{parentId}, FALSE, TRUE)
+    </insert>
+
+    <select id="wouldCreateCycle" resultType="boolean">
+        WITH RECURSIVE ancestors AS (
+            SELECT organization_unit_id, parent_id
+              FROM seal.organization_unit
+             WHERE organization_unit_id = #{parentId}
+            UNION ALL
+            SELECT parent.organization_unit_id, parent.parent_id
+              FROM seal.organization_unit parent
+              JOIN ancestors child ON parent.organization_unit_id = child.parent_id
+        )
+        SELECT EXISTS (SELECT 1 FROM ancestors WHERE organization_unit_id = #{organizationUnitId})
+    </select>
+
+    <select id="countActiveDependencies" resultType="int">
+        SELECT
+            (SELECT count(*) FROM seal.organization_unit
+              WHERE parent_id = #{organizationUnitId} AND active = TRUE)
+          + (SELECT count(*) FROM seal.admin_user
+              WHERE organization_unit_id = #{organizationUnitId} AND account_status &lt;&gt; 'INACTIVE')
+          + (SELECT count(*) FROM seal.retention_policy
+              WHERE owner_organization_unit_id = #{organizationUnitId} AND policy_status = 'ACTIVE')
+          + (SELECT count(*) FROM seal.processing_activity
+              WHERE owner_organization_unit_id = #{organizationUnitId} AND activity_status = 'ACTIVE')
+    </select>
+
+    <update id="update">
+        UPDATE seal.organization_unit
+           SET organization_name = #{organizationName},
+               parent_id = #{parentId, jdbcType=OTHER},
+               active = #{active},
+               updated_at = CURRENT_TIMESTAMP,
+               version_no = version_no + 1
+         WHERE organization_unit_id = #{organizationUnitId}
+           AND version_no = #{versionNo}
+    </update>
 </mapper>

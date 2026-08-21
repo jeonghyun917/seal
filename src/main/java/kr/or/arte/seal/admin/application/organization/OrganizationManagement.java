@@ -6,4 +6,10 @@ import java.util.UUID;
 public interface OrganizationManagement {
 
     List<OrganizationSummary> findVisibleOrganizations(UUID adminUserId);
+
+    OrganizationDetail findVisibleOrganization(UUID adminUserId, UUID organizationUnitId);
+
+    UUID create(OrganizationCreateCommand command);
+
+    void update(OrganizationUpdateCommand command);
 }

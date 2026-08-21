@@ -78,9 +78,11 @@ git commit -m "feat: establish least privilege database schema"
 
 **Files:**
 - Create: `src/main/java/kr/or/arte/seal/admin/domain/AdminAccountStatus.java`
-- Create: `src/main/java/kr/or/arte/seal/admin/domain/AdminAccount.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/domain/LoginLockPolicy.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/domain/LoginFailureResult.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/domain/PasswordPolicy.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/domain/PasswordValidationResult.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/domain/PasswordViolation.java`
 - Create: `src/test/java/kr/or/arte/seal/admin/domain/LoginLockPolicyTest.java`
 - Create: `src/test/java/kr/or/arte/seal/admin/domain/PasswordPolicyTest.java`
 
@@ -88,7 +90,7 @@ git commit -m "feat: establish least privilege database schema"
 - Consumes: `admin_user` columns from Task 1.
 - Produces: `LoginLockPolicy.recordFailure(int, Instant): LoginFailureResult`, `LoginLockPolicy.isTemporarilyLocked(Instant, Instant): boolean`, and `PasswordPolicy.validate(String, String): PasswordValidationResult` for authentication and bootstrap services.
 
-- [ ] **Step 1: Write failing lock-policy tests**
+- [x] **Step 1: Write failing lock-policy tests**
 
 ```java
 @Test
@@ -108,13 +110,13 @@ void fourthFailureDoesNotLock() {
 }
 ```
 
-- [ ] **Step 2: Run lock tests and verify RED**
+- [x] **Step 2: Run lock tests and verify RED**
 
 Run: `./mvnw.cmd -Dtest=LoginLockPolicyTest test`
 
 Expected: test compilation fails because the domain policy does not exist.
 
-- [ ] **Step 3: Implement the minimal immutable lock policy**
+- [x] **Step 3: Implement the minimal immutable lock policy**
 
 ```java
 public record LoginLockPolicy(int maxFailures, Duration lockDuration) {
@@ -128,23 +130,23 @@ public record LoginLockPolicy(int maxFailures, Duration lockDuration) {
 }
 ```
 
-- [ ] **Step 4: Run lock tests and verify GREEN**
+- [x] **Step 4: Run lock tests and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=LoginLockPolicyTest test`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing password-policy tests**
+- [x] **Step 5: Write failing password-policy tests**
 
 Test that 11 characters fail, 12 characters pass, 129 characters fail, and a value equal to the login ID fails without trimming the candidate.
 
-- [ ] **Step 6: Implement password policy and verify GREEN**
+- [x] **Step 6: Implement password policy and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=PasswordPolicyTest test`
 
 Expected: PASS for all boundary and login-ID equality cases.
 
-- [ ] **Step 7: Commit the domain rules**
+- [x] **Step 7: Commit the domain rules**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/admin/domain src/test/java/kr/or/arte/seal/admin/domain
@@ -156,6 +158,7 @@ git commit -m "feat: add administrator credential policies"
 ### Task 3: Authentication ports, MyBatis adapter, and audit append port
 
 **Files:**
+- Create: `src/main/java/kr/or/arte/seal/admin/domain/AdminAccount.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AdminAccountRepository.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AdminAuthenticationService.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AuthenticationResult.java`

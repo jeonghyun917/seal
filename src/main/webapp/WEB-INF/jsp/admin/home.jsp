@@ -30,8 +30,9 @@
         <a href="#pending-policy">보유정책</a>
         <a href="#pending-activity">처리업무</a>
         <span class="nav-group">시스템 관리</span>
-        <a href="#pending-account">관리자·권한</a>
-        <a href="#pending-audit">감사 이력</a>
+        <a href="${pageContext.request.contextPath}/admin/users">관리자 계정</a>
+        <a href="${pageContext.request.contextPath}/admin/roles">역할·권한</a>
+        <a href="${pageContext.request.contextPath}/admin/audit-events">감사 이력</a>
     </nav>
 
     <main class="admin-main">

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.audit.persistence.query.AuditEventQueryMapper">
+    <select id="findRecentVisibleEvents" resultType="kr.or.arte.seal.audit.application.query.AuditEventSummary">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION'
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        ), visible_actor AS (
+            SELECT user_account.admin_user_id
+              FROM seal.admin_user user_account
+              JOIN visible_scope scope ON scope.organization_unit_id = user_account.organization_unit_id
+        )
+        SELECT event.event_id, event.occurred_at, event.actor_type,
+               actor.display_name AS actor_display_name, event.action_code,
+               event.target_type, event.target_id, event.result, event.reason_code,
+               event.correlation_id
+          FROM seal.audit_event event
+          LEFT JOIN seal.admin_user actor ON actor.admin_user_id = event.actor_id
+         WHERE event.occurred_at &gt;= CURRENT_TIMESTAMP - INTERVAL '7 days'
+           AND (event.actor_type = 'SYSTEM' OR event.actor_id IN (SELECT admin_user_id FROM visible_actor))
+         ORDER BY event.occurred_at DESC, event.event_id DESC
+         LIMIT 200
+    </select>
+</mapper>

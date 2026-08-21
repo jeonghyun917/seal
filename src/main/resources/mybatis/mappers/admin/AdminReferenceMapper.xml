@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.admin.persistence.reference.AdminReferenceMapper">
+    <select id="findVisibleUsers" resultType="kr.or.arte.seal.admin.application.user.AdminUserSummary">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants
+              FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId}
+               AND scope_type = 'ORGANIZATION'
+            UNION
+            SELECT child.organization_unit_id, TRUE
+              FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+        SELECT DISTINCT u.admin_user_id, u.login_id, u.display_name,
+               organization.organization_name, u.account_status,
+               u.consecutive_failures, u.locked_until, u.last_login_at
+          FROM seal.admin_user u
+          JOIN visible_scope scope ON scope.organization_unit_id = u.organization_unit_id
+          JOIN seal.organization_unit organization ON organization.organization_unit_id = u.organization_unit_id
+         ORDER BY u.display_name, u.login_id
+    </select>
+
+    <select id="findRoles" resultType="kr.or.arte.seal.admin.application.role.RoleSummary">
+        SELECT role.role_id, role.role_code, role.role_name, role.system_role, role.active,
+               count(DISTINCT user_role.admin_user_id) AS user_count,
+               count(DISTINCT role_permission.permission_id) AS permission_count
+          FROM seal.admin_role role
+          LEFT JOIN seal.user_role user_role ON user_role.role_id = role.role_id
+          LEFT JOIN seal.role_permission role_permission ON role_permission.role_id = role.role_id
+         GROUP BY role.role_id, role.role_code, role.role_name, role.system_role, role.active
+         ORDER BY role.system_role DESC, role.role_code
+    </select>
+</mapper>

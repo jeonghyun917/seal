@@ -434,31 +434,31 @@ git commit -m "feat: add administrator login shell"
 - Consumes: all Phase 1A tasks.
 - Produces: a buildable feature branch and explicit evidence for what is verified without `seal_test`.
 
-- [ ] **Step 1: Run the complete unit and MVC suite**
+- [x] **Step 1: Run the complete unit and MVC suite**
 
 Run: `./mvnw.cmd test`
 
 Expected: all tests pass with zero failures and errors.
 
-- [ ] **Step 2: Build the executable WAR**
+- [x] **Step 2: Build the executable WAR**
 
 Run: `./mvnw.cmd clean package -DskipTests`
 
 Expected: `target/seal.war` is produced successfully.
 
-- [ ] **Step 3: Inspect the WAR and dependency exclusions**
+- [x] **Step 3: Inspect the WAR and dependency exclusions**
 
 Verify the WAR contains administrator JSPs, MyBatis mapper XML, eGovFrame runtime artifacts, PostgreSQL JDBC, and no Flyway, Liquibase, `.env`, or secret file.
 
-- [ ] **Step 4: Run an HTTP smoke test for public and custom login pages**
+- [x] **Step 4: Run an HTTP smoke test for public and custom login pages**
 
 Start the WAR with a deliberately unreachable local DB, request `/`, `/system/status`, and `/login`, and verify HTTP 200. Request `/admin` and verify it redirects to `/login`. Do not claim database login works until `seal_test` or `seal_dev` is available.
 
-- [ ] **Step 5: Document runtime configuration and remaining DB gate**
+- [x] **Step 5: Document runtime configuration and remaining DB gate**
 
 README must list bootstrap variables, configurable lock values, `seal_owner`/`seal_app` responsibilities, initial SQL commands, and the mandatory PostgreSQL integration-test gate.
 
-- [ ] **Step 6: Run fresh final verification and commit**
+- [x] **Step 6: Run fresh final verification and commit**
 
 ```powershell
 git add README.md docs/superpowers/plans/2026-08-21-phase1a-admin-auth-foundation.md
@@ -466,3 +466,11 @@ git commit -m "docs: document administrator authentication baseline"
 ```
 
 The final report must distinguish verified unit/MVC/WAR behavior from pending real PostgreSQL authentication and SQL execution.
+
+## Verification Evidence (2026-08-21)
+
+- `mvnw.cmd test`: 41 tests, 0 failures, 0 errors.
+- `mvnw.cmd clean package -DskipTests`: executable `target/seal.war` produced.
+- WAR inspection: administrator JSPs, MyBatis mapper XML, eGovFrame 5.0.0 runtime modules and PostgreSQL JDBC present; Flyway, Liquibase, `.env`, PEM and key files absent.
+- Latest WAR HTTP smoke with deliberately unreachable DB: `/`, `/system/status`, `/login` returned 200 with CSP; `/admin` returned 302 to the custom `/login` page.
+- PostgreSQL 16.14 execution of initial SQL, `001_phase1a_verify.sql`, and real DB login remain mandatory external gates.

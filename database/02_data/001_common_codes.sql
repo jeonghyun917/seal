@@ -1,26 +1,68 @@
 \set ON_ERROR_STOP on
 \encoding UTF8
 
+\if :{?script_checksum}
+\else
+  \echo 'script_checksum psql variable is required'
+  \quit 3
+\endif
+\if :{?app_version}
+\else
+  \echo 'app_version psql variable is required'
+  \quit 3
+\endif
+
+\connect seal_dev
+
 BEGIN;
+SET LOCAL ROLE seal_owner;
 SET LOCAL search_path = seal, public;
 
-INSERT INTO common_code (code_group, code_value, code_name, sort_order, description) VALUES
-    ('MAIL_STATUS', 'QUEUED', '발송 대기', 10, '아직 SMTP 릴레이에 전달하지 않은 상태'),
-    ('MAIL_STATUS', 'PROCESSING', '발송 처리 중', 20, '발송 작업자가 처리권을 획득한 상태'),
-    ('MAIL_STATUS', 'SMTP_ACCEPTED', '메일 서버 접수', 30, 'SMTP 릴레이가 메시지를 접수한 상태이며 최종 수신을 의미하지 않음'),
-    ('MAIL_STATUS', 'SEND_FAILED', '발송 실패', 40, '재시도하지 않는 즉시 실패 또는 최대 재시도 초과'),
-    ('MAIL_STATUS', 'RETRY_SCHEDULED', '재시도 예정', 50, '일시 장애로 다음 시도 시각을 예약한 상태'),
-    ('LINK_STATUS', 'ISSUED', '발급', 10, '일회용 링크 발급 완료'),
-    ('LINK_STATUS', 'ACCESSED', '접속', 20, '사용자가 링크 대상 웹페이지에 접속'),
-    ('LINK_STATUS', 'EXPIRED', '만료', 30, '유효기간 종료'),
-    ('LINK_STATUS', 'REVOKED', '폐기', 40, '취소 또는 재발급으로 무효화'),
-    ('LINK_STATUS', 'COMPLETED', '사용 완료', 50, '최종 응답 제출 완료'),
-    ('RESPONSE_STATUS', 'NOT_STARTED', '미응답', 10, '응답을 시작하지 않음'),
-    ('RESPONSE_STATUS', 'IN_PROGRESS', '작성 중', 20, '항목별 결정을 작성 중'),
-    ('RESPONSE_STATUS', 'SUBMITTED', '동의 결과 제출', 30, '하나 이상의 동의 결과를 최종 제출'),
-    ('RESPONSE_STATUS', 'DECLINED_ALL', '전체 미동의 제출', 40, '모든 항목에 미동의로 최종 제출');
+INSERT INTO organization_unit (
+    organization_unit_id, organization_code, organization_name, root_unit
+) VALUES (
+    '00000000-0000-0000-0000-000000000001', 'ARTE', '한국문화예술교육진흥원', TRUE
+);
 
-INSERT INTO db_change_history (script_name, description)
-VALUES ('02_data/001_common_codes.sql', '메일, 링크, 응답 상태 초기 코드 등록');
+INSERT INTO admin_role (role_id, role_code, role_name, system_role) VALUES
+    ('00000000-0000-0000-0001-000000000001', 'SYSTEM_ADMIN', '시스템 관리자', TRUE),
+    ('00000000-0000-0000-0001-000000000002', 'PRIVACY_OFFICER', '개인정보 보호책임 업무담당자', TRUE),
+    ('00000000-0000-0000-0001-000000000003', 'DEPARTMENT_MANAGER', '부서 관리자', TRUE),
+    ('00000000-0000-0000-0001-000000000004', 'OPERATOR', '업무 담당자', TRUE),
+    ('00000000-0000-0000-0001-000000000005', 'AUDITOR', '감사 조회자', TRUE);
+
+INSERT INTO permission (permission_id, permission_code, permission_name) VALUES
+    ('00000000-0000-0000-0002-000000000001', 'ORGANIZATION_VIEW', '조직 조회'),
+    ('00000000-0000-0000-0002-000000000002', 'ORGANIZATION_MANAGE', '조직 관리'),
+    ('00000000-0000-0000-0002-000000000003', 'USER_VIEW', '관리자 조회'),
+    ('00000000-0000-0000-0002-000000000004', 'USER_MANAGE', '관리자 관리'),
+    ('00000000-0000-0000-0002-000000000005', 'USER_UNLOCK', '관리자 잠금 해제'),
+    ('00000000-0000-0000-0002-000000000006', 'USER_RESET_PASSWORD', '관리자 비밀번호 초기화'),
+    ('00000000-0000-0000-0002-000000000007', 'ROLE_VIEW', '역할 조회'),
+    ('00000000-0000-0000-0002-000000000008', 'ROLE_MANAGE', '역할 관리'),
+    ('00000000-0000-0000-0002-000000000009', 'RETENTION_POLICY_VIEW', '보유정책 조회'),
+    ('00000000-0000-0000-0002-000000000010', 'RETENTION_POLICY_EDIT', '보유정책 편집'),
+    ('00000000-0000-0000-0002-000000000011', 'RETENTION_POLICY_REVIEW', '보유정책 검토 요청'),
+    ('00000000-0000-0000-0002-000000000012', 'RETENTION_POLICY_APPROVE', '보유정책 승인'),
+    ('00000000-0000-0000-0002-000000000013', 'PROCESSING_ACTIVITY_VIEW', '처리업무 조회'),
+    ('00000000-0000-0000-0002-000000000014', 'PROCESSING_ACTIVITY_EDIT', '처리업무 편집'),
+    ('00000000-0000-0000-0002-000000000015', 'PROCESSING_ACTIVITY_REVIEW', '처리업무 검토 요청'),
+    ('00000000-0000-0000-0002-000000000016', 'PROCESSING_ACTIVITY_APPROVE', '처리업무 승인'),
+    ('00000000-0000-0000-0002-000000000017', 'AUDIT_VIEW', '감사 이벤트 조회');
+
+INSERT INTO role_permission (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM admin_role r
+CROSS JOIN permission p
+WHERE r.role_code = 'SYSTEM_ADMIN';
+
+INSERT INTO db_change_history (
+    script_name, script_checksum, application_version, description
+) VALUES (
+    '02_data/001_common_codes.sql',
+    :'script_checksum',
+    :'app_version',
+    '루트 조직, 기본 역할, 권한과 시스템 관리자 역할 권한 등록'
+);
 
 COMMIT;

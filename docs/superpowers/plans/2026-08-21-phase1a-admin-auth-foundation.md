@@ -38,7 +38,7 @@
 - Consumes: approved Phase 1 data model and the fact that no existing development DB has applied these initial scripts.
 - Produces: `seal_owner`, `seal_app`, `organization_unit`, `admin_user`, `role`, `permission`, `user_role`, `role_permission`, `user_scope`, `audit_event`, and manual change history tables for later authentication adapters.
 
-- [ ] **Step 1: Initialize Git, commit the approved baseline, and create the feature branch**
+- [x] **Step 1: Initialize Git, commit the approved baseline, and create the feature branch**
 
 ```powershell
 git init -b main
@@ -49,49 +49,26 @@ git switch -c feature/phase1-admin-auth
 
 Only source, configuration, approved documents, and tests are included. Existing generated design renders and user artifacts remain untracked.
 
-- [ ] **Step 2: Write the database script contract test**
+- [x] **Step 2: Reject source-text-only SQL tests and define executable DB verification**
 
-```java
-class DatabaseScriptContractTest {
-    @Test
-    void ownerRoleCannotLoginAndApplicationDoesNotOwnDatabase() throws IOException {
-        String script = Files.readString(Path.of("database/00_admin/001_create_dev_database.sql"));
-        assertThat(script).contains("seal_owner NOLOGIN");
-        assertThat(script).contains("OWNER = seal_owner");
-        assertThat(script).doesNotContain("OWNER = seal_app");
-    }
+The test guidance review found that grepping SQL source text would only prove wording, not applied ownership or privileges. `database/04_verify/001_phase1a_verify.sql` is therefore the authoritative executable check. Its execution remains a mandatory gate when `seal_test` or `seal_dev` is available.
 
-    @Test
-    void auditTableIsAppendOnlyForApplicationRole() throws IOException {
-        String script = Files.readString(Path.of("database/01_schema/002_create_core_tables.sql"));
-        assertThat(script).contains("GRANT SELECT, INSERT ON audit_event TO seal_app");
-        assertThat(script).contains("REVOKE UPDATE, DELETE ON audit_event FROM seal_app");
-    }
-}
-```
-
-- [ ] **Step 3: Run the focused test and verify RED**
-
-Run: `./mvnw.cmd -Dtest=DatabaseScriptContractTest test`
-
-Expected: FAIL because the current database owner is `seal_app` and the phase 1A grant statements do not exist.
-
-- [ ] **Step 4: Rewrite initial SQL for separated ownership and phase 1A tables**
+- [x] **Step 3: Rewrite initial SQL for separated ownership and phase 1A tables**
 
 The admin script must create `seal_owner NOLOGIN`, create or alter `seal_app LOGIN`, and create `seal_dev OWNER seal_owner`. The schema script must use `SET ROLE seal_owner`. The core schema must define account states `ACTIVE`, `LOCKED`, `INACTIVE`, UUID primary keys supplied by Java, UTC-capable `TIMESTAMPTZ`, optimistic `version_no`, foreign keys, and audit append-only grants.
 
 The verification SQL must fail with `ON_ERROR_STOP` when ownership, grants, required tables, or change-history rows differ from the approved model.
 
-- [ ] **Step 5: Run the focused test and verify GREEN**
+- [ ] **Step 4: Run executable verification on PostgreSQL 16.14**
 
-Run: `./mvnw.cmd -Dtest=DatabaseScriptContractTest test`
+Run: `psql -X -v ON_ERROR_STOP=1 -f database/04_verify/001_phase1a_verify.sql`
 
-Expected: PASS with both SQL ownership and audit privilege assertions satisfied.
+Expected: PASS only after the initial scripts are applied to `seal_test` or `seal_dev`. This step is intentionally pending while the external database is being prepared.
 
-- [ ] **Step 6: Commit the schema baseline**
+- [x] **Step 5: Commit the schema baseline**
 
 ```powershell
-git add database src/test/java/kr/or/arte/seal/database
+git add database docs/superpowers/plans/2026-08-21-phase1a-admin-auth-foundation.md
 git commit -m "feat: establish least privilege database schema"
 ```
 

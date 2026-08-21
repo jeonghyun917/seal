@@ -7,7 +7,7 @@
 ## Task 1: DB 패치와 검증
 
 **Files**
-- Create: `database/03_patch/001_create_policy_tables.sql`
+- Create: `database/03_patch/20260821_001_create_policy_tables.sql`
 - Create: `database/04_verify/002_phase1b_verify.sql`
 - Modify: `docs/superpowers/specs/2026-08-20-phase1-admin-policy-design.md`
 

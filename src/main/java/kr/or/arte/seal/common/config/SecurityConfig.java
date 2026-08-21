@@ -1,6 +1,8 @@
 package kr.or.arte.seal.common.config;
 
 import jakarta.servlet.DispatcherType;
+import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -12,7 +14,11 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ObjectProvider<DatabaseAuthenticationProvider> databaseProvider
+    ) throws Exception {
+        databaseProvider.ifAvailable(http::authenticationProvider);
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR)

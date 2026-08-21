@@ -17,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-public class AdminAuthenticationService {
+public class AdminAuthenticationService implements AdminAuthenticator {
 
     private final AdminAccountRepository accountRepository;
     private final AuditEventWriter auditEventWriter;
@@ -39,6 +39,7 @@ public class AdminAuthenticationService {
         this.dummyPasswordHash = Objects.requireNonNull(dummyPasswordHash, "dummyPasswordHash");
     }
 
+    @Override
     @Transactional
     public AuthenticationResult authenticate(String loginId, String password, Instant now) {
         Objects.requireNonNull(now, "now");

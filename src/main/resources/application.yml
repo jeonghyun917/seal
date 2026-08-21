@@ -62,6 +62,13 @@ management:
       show-details: never
 
 seal:
+  admin-security:
+    max-login-failures: ${SEAL_ADMIN_MAX_LOGIN_FAILURES:5}
+    temporary-lock-duration: ${SEAL_ADMIN_LOCK_DURATION:15m}
+  bootstrap-admin:
+    id: ${SEAL_BOOTSTRAP_ADMIN_ID:}
+    name: ${SEAL_BOOTSTRAP_ADMIN_NAME:}
+    password: ${SEAL_BOOTSTRAP_ADMIN_PASSWORD:}
   mail:
     enabled: ${SEAL_MAIL_ENABLED:false}
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}

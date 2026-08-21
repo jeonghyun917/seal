@@ -263,6 +263,7 @@ git commit -m "feat: add database authentication service"
 **Files:**
 - Modify: `src/main/java/kr/or/arte/seal/common/config/SecurityConfig.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/config/AdminSecurityProperties.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/config/AdminSecurityConfiguration.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/config/BootstrapAdminProperties.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/config/DatabaseAuthenticationProvider.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/config/BootstrapAdminRunner.java`
@@ -273,22 +274,23 @@ git commit -m "feat: add database authentication service"
 - Modify: `.env.example`
 - Create: `src/test/java/kr/or/arte/seal/admin/config/DatabaseAuthenticationProviderTest.java`
 - Create: `src/test/java/kr/or/arte/seal/admin/config/BootstrapAdminRunnerTest.java`
+- Create: `src/test/java/kr/or/arte/seal/admin/config/AdminSecurityConfigurationTest.java`
 
 **Interfaces:**
 - Consumes: Task 3 `AdminAuthenticationService` and repository port.
 - Produces: a Spring `AuthenticationProvider`, BCrypt strength-12 bean, configurable lock settings, one-time bootstrap, and mandatory-password-change access enforcement.
 
-- [ ] **Step 1: Write failing provider tests**
+- [x] **Step 1: Write failing provider tests**
 
 Verify authenticated roles become `ROLE_*`, permission codes become authorities without the prefix, invalid credentials always throw `BadCredentialsException`, and temporary lock does not reveal whether the password was correct.
 
-- [ ] **Step 2: Run provider tests and verify RED**
+- [x] **Step 2: Run provider tests and verify RED**
 
 Run: `./mvnw.cmd -Dtest=DatabaseAuthenticationProviderTest test`
 
 Expected: compilation failure because the provider does not exist.
 
-- [ ] **Step 3: Implement provider and security properties**
+- [x] **Step 3: Implement provider and security properties**
 
 Properties:
 
@@ -301,23 +303,23 @@ seal:
 
 Remove all `spring.security.user.*` configuration. Define `BCryptPasswordEncoder(12)` and register the custom provider.
 
-- [ ] **Step 4: Run provider tests and verify GREEN**
+- [x] **Step 4: Run provider tests and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=DatabaseAuthenticationProviderTest test`
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing bootstrap tests**
+- [x] **Step 5: Write failing bootstrap tests**
 
 Verify the runner creates exactly one account only when the repository is empty and all three environment-backed fields exist; verify it does nothing when any user exists; verify the stored account requires a password change.
 
-- [ ] **Step 6: Implement bootstrap and verify GREEN**
+- [x] **Step 6: Implement bootstrap and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=BootstrapAdminRunnerTest test`
 
 Expected: PASS without logging credentials.
 
-- [ ] **Step 7: Commit security integration**
+- [x] **Step 7: Commit security integration**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/admin/config src/main/java/kr/or/arte/seal/common/config src/main/resources .env.example src/test/java/kr/or/arte/seal/admin/config

@@ -9,12 +9,6 @@ spring:
     hikari:
       maximum-pool-size: ${SEAL_DB_POOL_MAX:20}
       minimum-idle: ${SEAL_DB_POOL_MIN:5}
-  security:
-    user:
-      name: ${SEAL_ADMIN_USERNAME}
-      password: ${SEAL_ADMIN_PASSWORD}
-      roles: ADMIN
-
 server:
   servlet:
     session:

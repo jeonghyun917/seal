@@ -5,6 +5,7 @@ import kr.or.arte.seal.admin.application.PasswordChangeResult;
 import kr.or.arte.seal.admin.application.PasswordChangeStatus;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.common.config.SecurityConfig;
+import kr.or.arte.seal.common.web.HomeController;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -30,7 +31,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {
         LoginController.class,
         AdminHomeController.class,
-        PasswordChangeController.class
+        PasswordChangeController.class,
+        HomeController.class
 })
 @Import(SecurityConfig.class)
 class AdminSecurityMvcTest {
@@ -84,6 +86,13 @@ class AdminSecurityMvcTest {
         mockMvc.perform(get("/account/password/change").with(authentication(adminAuthentication(true))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/password-change"));
+    }
+
+    @Test
+    void forcedChangeAccountCanStillReadPublicHome() throws Exception {
+        mockMvc.perform(get("/").with(authentication(adminAuthentication(true))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("home"));
     }
 
     @Test

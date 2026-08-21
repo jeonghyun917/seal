@@ -34,9 +34,9 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        return path.equals(CHANGE_PATH)
-                || path.equals("/logout")
-                || path.equals("/error")
-                || path.startsWith("/resources/");
+        boolean administratorPath = path.equals("/admin")
+                || path.startsWith("/admin/")
+                || path.startsWith("/account/");
+        return path.equals(CHANGE_PATH) || !administratorPath;
     }
 }

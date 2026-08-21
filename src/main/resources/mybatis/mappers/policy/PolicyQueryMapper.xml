@@ -47,6 +47,61 @@
           JOIN seal.organization_unit organization ON organization.organization_unit_id = policy.owner_organization_unit_id
          WHERE policy.retention_policy_id = #{retentionPolicyId}
     </select>
+    <select id="findVisibleProcessingActivity" resultType="kr.or.arte.seal.policy.application.activity.ProcessingActivityDetail">
+        <include refid="visibleOrganizationScope"/>
+        SELECT activity.processing_activity_id, activity.activity_code, activity.activity_name,
+               activity.owner_organization_unit_id, organization.organization_name,
+               activity.activity_status, activity.current_approved_version_id, activity.version_no
+          FROM seal.processing_activity activity
+          JOIN visible_scope scope ON scope.organization_unit_id = activity.owner_organization_unit_id
+          JOIN seal.organization_unit organization ON organization.organization_unit_id = activity.owner_organization_unit_id
+         WHERE activity.processing_activity_id = #{processingActivityId}
+    </select>
+    <select id="findVisibleProcessingActivityVersions" resultType="kr.or.arte.seal.policy.application.activity.ProcessingActivityVersionView">
+        <include refid="visibleOrganizationScope"/>
+        SELECT version.processing_activity_version_id, version.version_number, version.workflow_status,
+               version.processing_purpose, version.legal_basis_type, version.legal_basis_detail,
+               policy.policy_name AS retention_policy_name,
+               retention_version.version_number AS retention_version_number,
+               creator.display_name AS created_by_name,
+               requester.display_name AS review_requested_by_name,
+               approver.display_name AS approved_by_name, version.rejection_comment
+          FROM seal.processing_activity_version version
+          JOIN seal.processing_activity activity ON activity.processing_activity_id = version.processing_activity_id
+          JOIN visible_scope scope ON scope.organization_unit_id = activity.owner_organization_unit_id
+          JOIN seal.retention_policy_version retention_version
+            ON retention_version.retention_policy_version_id = version.retention_policy_version_id
+          JOIN seal.retention_policy policy ON policy.retention_policy_id = retention_version.retention_policy_id
+          JOIN seal.admin_user creator ON creator.admin_user_id = version.created_by
+          LEFT JOIN seal.admin_user requester ON requester.admin_user_id = version.review_requested_by
+          LEFT JOIN seal.admin_user approver ON approver.admin_user_id = version.approved_by
+         WHERE version.processing_activity_id = #{processingActivityId}
+         ORDER BY version.version_number DESC
+    </select>
+    <select id="findVisibleProcessingDataItems" resultType="kr.or.arte.seal.policy.application.activity.ProcessingDataItemView">
+        <include refid="visibleOrganizationScope"/>
+        SELECT item.processing_activity_version_id, item.item_order, item.item_name,
+               item.necessity_reason, item.required
+          FROM seal.processing_data_item item
+          JOIN seal.processing_activity_version version
+            ON version.processing_activity_version_id = item.processing_activity_version_id
+          JOIN seal.processing_activity activity ON activity.processing_activity_id = version.processing_activity_id
+          JOIN visible_scope scope ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE activity.processing_activity_id = #{processingActivityId}
+         ORDER BY version.version_number DESC, item.item_order
+    </select>
+    <select id="findApprovedRetentionPolicies" resultType="kr.or.arte.seal.policy.application.activity.ApprovedRetentionPolicyOption">
+        <include refid="visibleOrganizationScope"/>
+        SELECT version.retention_policy_version_id, policy.policy_code, policy.policy_name,
+               version.version_number, organization.organization_name
+          FROM seal.retention_policy policy
+          JOIN visible_scope scope ON scope.organization_unit_id = policy.owner_organization_unit_id
+          JOIN seal.organization_unit organization ON organization.organization_unit_id = policy.owner_organization_unit_id
+          JOIN seal.retention_policy_version version
+            ON version.retention_policy_version_id = policy.current_approved_version_id
+         WHERE policy.policy_status = 'ACTIVE' AND version.workflow_status = 'APPROVED'
+         ORDER BY policy.policy_code
+    </select>
     <select id="findVisibleRetentionPolicyVersions" resultType="kr.or.arte.seal.policy.application.retention.RetentionPolicyVersionView">
         <include refid="visibleOrganizationScope"/>
         SELECT version.retention_policy_version_id, version.version_number, version.workflow_status,

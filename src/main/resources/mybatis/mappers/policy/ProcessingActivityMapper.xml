@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.policy.persistence.activity.ProcessingActivityMapper">
+    <sql id="visibleScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+
+    <select id="canAccessActiveOrganization" resultType="boolean">
+        <include refid="visibleScope"/>
+        SELECT EXISTS (
+            SELECT 1 FROM visible_scope scope
+              JOIN seal.organization_unit organization
+                ON organization.organization_unit_id = scope.organization_unit_id
+             WHERE organization.organization_unit_id = #{organizationUnitId}
+               AND organization.active = TRUE
+        )
+    </select>
+
+    <select id="canUseApprovedRetentionVersion" resultType="boolean">
+        <include refid="visibleScope"/>
+        SELECT EXISTS (
+            SELECT 1
+              FROM seal.retention_policy_version version
+              JOIN seal.retention_policy policy ON policy.retention_policy_id = version.retention_policy_id
+              JOIN visible_scope scope ON scope.organization_unit_id = policy.owner_organization_unit_id
+             WHERE version.retention_policy_version_id = #{retentionPolicyVersionId}
+               AND version.workflow_status = 'APPROVED'
+               AND policy.policy_status = 'ACTIVE'
+               AND policy.current_approved_version_id = version.retention_policy_version_id
+        )
+    </select>
+
+    <insert id="insertActivity">
+        INSERT INTO seal.processing_activity (processing_activity_id, activity_code, activity_name,
+            owner_organization_unit_id, activity_status, created_by, updated_by)
+        VALUES (#{processingActivityId}, #{activityCode}, #{activityName},
+            #{ownerOrganizationUnitId}, 'ACTIVE', #{actorId}, #{actorId})
+    </insert>
+
+    <insert id="insertVersion">
+        INSERT INTO seal.processing_activity_version (processing_activity_version_id,
+            processing_activity_id, version_number, workflow_status, processing_purpose,
+            legal_basis_type, legal_basis_detail, retention_policy_version_id, created_by, updated_by)
+        VALUES (#{processingActivityVersionId}, #{processingActivityId}, #{versionNumber}, 'DRAFT',
+            #{processingPurpose}, #{legalBasisType}, #{legalBasisDetail},
+            #{retentionPolicyVersionId}, #{actorId}, #{actorId})
+    </insert>
+
+    <insert id="insertDataItems">
+        INSERT INTO seal.processing_data_item (processing_data_item_id,
+            processing_activity_version_id, item_order, item_name, necessity_reason, required, data_category)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.processingDataItemId}, #{item.processingActivityVersionId}, #{item.itemOrder},
+             #{item.itemName}, #{item.necessityReason}, #{item.required}, 'GENERAL')
+        </foreach>
+    </insert>
+
+    <select id="findVisibleVersionForUpdate" resultType="kr.or.arte.seal.policy.persistence.activity.ProcessingActivityVersionRow">
+        <include refid="visibleScope"/>
+        SELECT version.processing_activity_version_id, version.processing_activity_id,
+               version.version_number, version.workflow_status, version.processing_purpose,
+               version.legal_basis_type, version.legal_basis_detail,
+               version.retention_policy_version_id, version.created_by,
+               version.review_requested_by, version.approved_by,
+               version.rejection_comment, version.version_no
+          FROM seal.processing_activity_version version
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = version.processing_activity_id
+          JOIN visible_scope scope ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE version.processing_activity_id = #{processingActivityId}
+           AND version.processing_activity_version_id = #{processingActivityVersionId}
+         FOR UPDATE
+    </select>
+
+    <select id="findDataItems" resultType="kr.or.arte.seal.policy.domain.activity.ProcessingDataItem">
+        SELECT item_name, necessity_reason, required
+          FROM seal.processing_data_item
+         WHERE processing_activity_version_id = #{processingActivityVersionId}
+         ORDER BY item_order
+    </select>
+
+    <update id="updateVersionTransition">
+        UPDATE seal.processing_activity_version
+           SET workflow_status = #{version.workflowStatus},
+               review_requested_by = #{version.reviewRequestedBy, jdbcType=OTHER},
+               review_requested_at = CASE WHEN #{version.workflowStatus} = 'REVIEW_REQUESTED'
+                    THEN #{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}
+                    WHEN #{version.workflowStatus} = 'DRAFT' THEN NULL ELSE review_requested_at END,
+               approved_by = #{version.approvedBy, jdbcType=OTHER},
+               approved_at = CASE WHEN #{version.workflowStatus} = 'APPROVED'
+                    THEN CAST(#{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE} AS TIMESTAMPTZ)
+                    ELSE NULL::TIMESTAMPTZ END,
+               rejection_comment = #{version.rejectionComment, jdbcType=VARCHAR},
+               updated_by = #{actorId}, updated_at = #{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE},
+               version_no = version_no + 1
+         WHERE processing_activity_version_id = #{version.processingActivityVersionId}
+           AND version_no = #{version.versionNo}
+    </update>
+
+    <update id="supersedePreviousApprovedVersions">
+        UPDATE seal.processing_activity_version
+           SET workflow_status = 'SUPERSEDED', updated_by = #{actorId},
+               updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE processing_activity_id = #{processingActivityId}
+           AND processing_activity_version_id &lt;&gt; #{approvedVersionId}
+           AND workflow_status = 'APPROVED'
+    </update>
+
+    <update id="updateCurrentApprovedVersion">
+        UPDATE seal.processing_activity
+           SET current_approved_version_id = #{approvedVersionId}, updated_by = #{actorId},
+               updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE processing_activity_id = #{processingActivityId}
+    </update>
+</mapper>

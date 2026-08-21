@@ -46,5 +46,7 @@
 .permission-list article { padding: 14px; border: 1px solid #dce4ef; border-radius: 10px; }
 .permission-list article span { float: right; color: #63748c; font-size: .78rem; }
 .permission-list article p { margin: 8px 0 0; color: #63748c; font-size: .84rem; }
+.full-field { grid-column: 1 / -1; }
+.data-item-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; align-items: center; }
 .action-panel { margin-top: 18px; }
 @media (max-width: 700px) { .data-form, .permission-grid, .permission-list { grid-template-columns: 1fr; } .version-heading { flex-direction: column; } }

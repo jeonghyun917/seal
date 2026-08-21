@@ -4,6 +4,7 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.policy.application.activity.ProcessingActivityQuery;
+import kr.or.arte.seal.policy.application.activity.ProcessingActivityManagementService;
 import kr.or.arte.seal.policy.application.retention.RetentionPolicyQuery;
 import kr.or.arte.seal.policy.application.retention.RetentionPolicyManagementService;
 import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
@@ -38,6 +39,7 @@ class PolicyReferencePagesControllerTest {
     @MockitoBean RetentionPolicyManagementService retentionPolicyManagementService;
     @MockitoBean OrganizationManagement organizationManagement;
     @MockitoBean ProcessingActivityQuery processingActivityQuery;
+    @MockitoBean ProcessingActivityManagementService processingActivityManagementService;
     @MockitoBean DatabaseAuthenticationProvider databaseAuthenticationProvider;
 
     @Test
@@ -58,6 +60,33 @@ class PolicyReferencePagesControllerTest {
         mockMvc.perform(get("/admin/processing-activities").with(authentication(admin("PROCESSING_ACTIVITY_VIEW"))))
                 .andExpect(status().isOk()).andExpect(view().name("admin/processing-activities/list"))
                 .andExpect(model().attributeExists("activities"));
+    }
+
+    @Test
+    void permittedAdministratorCanOpenProcessingActivityForm() throws Exception {
+        mockMvc.perform(get("/admin/processing-activities/new")
+                        .with(authentication(admin("PROCESSING_ACTIVITY_EDIT"))))
+                .andExpect(status().isOk()).andExpect(view().name("admin/processing-activities/form"))
+                .andExpect(model().attributeExists("activityForm", "organizations", "retentionPolicies"));
+    }
+
+    @Test
+    void validProcessingActivityFormCreatesDraftAndRedirects() throws Exception {
+        UUID activityId = UUID.fromString("80000000-0000-0000-0000-000000000001");
+        given(processingActivityManagementService.create(any())).willReturn(activityId);
+        mockMvc.perform(post("/admin/processing-activities")
+                        .with(authentication(admin("PROCESSING_ACTIVITY_EDIT"))).with(csrf())
+                        .param("activityCode", "EDU-PROGRAM")
+                        .param("activityName", "교육 프로그램 운영")
+                        .param("ownerOrganizationUnitId", "30000000-0000-0000-0000-000000000001")
+                        .param("processingPurpose", "교육 프로그램 참여자를 등록하고 운영하기 위한 목적입니다.")
+                        .param("legalBasisType", "CONSENT")
+                        .param("legalBasisDetail", "정보주체의 개인정보 수집 이용 동의")
+                        .param("retentionPolicyVersionId", "70000000-0000-0000-0000-000000000001")
+                        .param("itemName1", "성명").param("necessityReason1", "참여자 식별과 출석 확인")
+                        .param("required1", "true"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/processing-activities/" + activityId + "?created"));
     }
 
     @Test

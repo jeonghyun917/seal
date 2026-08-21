@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.admin.persistence.organization.OrganizationMapper">
+
+    <select id="findVisibleOrganizations"
+            resultType="kr.or.arte.seal.admin.application.organization.OrganizationSummary">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants
+              FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId}
+               AND scope_type = 'ORGANIZATION'
+            UNION
+            SELECT child.organization_unit_id, TRUE
+              FROM seal.organization_unit child
+              JOIN visible_scope parent_scope
+                ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+        SELECT DISTINCT organization.organization_unit_id,
+               organization.organization_code,
+               organization.organization_name,
+               parent.organization_name AS parent_organization_name,
+               organization.root_unit,
+               organization.active,
+               organization.version_no
+          FROM visible_scope scope
+          JOIN seal.organization_unit organization
+            ON organization.organization_unit_id = scope.organization_unit_id
+          LEFT JOIN seal.organization_unit parent
+            ON parent.organization_unit_id = organization.parent_id
+         ORDER BY organization.root_unit DESC, organization.organization_code
+    </select>
+</mapper>

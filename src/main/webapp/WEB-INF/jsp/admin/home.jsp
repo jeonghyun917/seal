@@ -26,6 +26,7 @@
     <nav class="admin-nav" aria-label="관리자 주 메뉴">
         <a class="active" href="${pageContext.request.contextPath}/admin" aria-current="page">대시보드</a>
         <span class="nav-group">기준정보</span>
+        <a href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
         <a href="#pending-policy">보유정책</a>
         <a href="#pending-activity">처리업무</a>
         <span class="nav-group">시스템 관리</span>

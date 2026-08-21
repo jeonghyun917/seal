@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.validation.BindingResult;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.LinkedHashSet;
 import java.util.UUID;
@@ -39,7 +40,7 @@ public class RoleController {
     }
 
     @GetMapping("/admin/roles/new")
-    @PreAuthorize("hasAuthority('ROLE_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_SYSTEM_ADMIN') and hasAuthority('ROLE_VIEW') and hasAuthority('ROLE_MANAGE')")
     public String createForm(@AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("roleForm", new RoleForm());
         populateForm(principal, model, false, null);
@@ -47,7 +48,7 @@ public class RoleController {
     }
 
     @PostMapping("/admin/roles")
-    @PreAuthorize("hasAuthority('ROLE_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_SYSTEM_ADMIN') and hasAuthority('ROLE_VIEW') and hasAuthority('ROLE_MANAGE')")
     public String create(@Valid @ModelAttribute("roleForm") RoleForm form,
             BindingResult bindingResult, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         validatePermissions(form, bindingResult);
@@ -55,9 +56,17 @@ public class RoleController {
             populateForm(principal, model, false, null);
             return "admin/roles/form";
         }
-        UUID roleId = management.create(new RoleCreateCommand(form.getRoleCode(), form.getRoleName(),
-                form.getPermissionIds(), principal.adminUserId()));
-        return "redirect:/admin/roles/" + roleId + "?created";
+        try {
+            UUID roleId = management.create(new RoleCreateCommand(form.getRoleCode(), form.getRoleName(),
+                    form.getPermissionIds(), principal.adminUserId()));
+            return "redirect:/admin/roles/" + roleId + "?created";
+        } catch (IllegalArgumentException exception) {
+            bindingResult.rejectValue("permissionIds", "invalid", exception.getMessage());
+        } catch (DataIntegrityViolationException exception) {
+            bindingResult.rejectValue("roleCode", "duplicate", "이미 사용 중인 역할코드입니다.");
+        }
+        populateForm(principal, model, false, null);
+        return "admin/roles/form";
     }
 
     @GetMapping("/admin/roles/{roleId}")
@@ -72,7 +81,7 @@ public class RoleController {
     }
 
     @GetMapping("/admin/roles/{roleId}/edit")
-    @PreAuthorize("hasAuthority('ROLE_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_SYSTEM_ADMIN') and hasAuthority('ROLE_VIEW') and hasAuthority('ROLE_MANAGE')")
     public String editForm(@PathVariable UUID roleId,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         RoleDetail role = management.findRole(roleId);
@@ -88,7 +97,7 @@ public class RoleController {
     }
 
     @PostMapping("/admin/roles/{roleId}")
-    @PreAuthorize("hasAuthority('ROLE_MANAGE')")
+    @PreAuthorize("hasAuthority('ROLE_SYSTEM_ADMIN') and hasAuthority('ROLE_VIEW') and hasAuthority('ROLE_MANAGE')")
     public String update(@PathVariable UUID roleId,
             @Valid @ModelAttribute("roleForm") RoleForm form, BindingResult bindingResult,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
@@ -98,9 +107,15 @@ public class RoleController {
             populateForm(principal, model, true, role);
             return "admin/roles/form";
         }
-        management.update(new RoleUpdateCommand(roleId, form.getRoleName(), form.isActive(),
-                form.getPermissionIds(), form.getVersionNo(), principal.adminUserId()));
-        return "redirect:/admin/roles/" + roleId + "?updated";
+        try {
+            management.update(new RoleUpdateCommand(roleId, form.getRoleName(), form.isActive(),
+                    form.getPermissionIds(), form.getVersionNo(), principal.adminUserId()));
+            return "redirect:/admin/roles/" + roleId + "?updated";
+        } catch (IllegalArgumentException exception) {
+            bindingResult.rejectValue("permissionIds", "invalid", exception.getMessage());
+            populateForm(principal, model, true, role);
+            return "admin/roles/form";
+        }
     }
 
     private void populateForm(AdminPrincipal principal, Model model,

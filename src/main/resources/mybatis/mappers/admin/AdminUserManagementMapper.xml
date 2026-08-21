@@ -44,8 +44,11 @@
         SELECT EXISTS (SELECT 1 FROM visible_scope WHERE organization_unit_id = #{organizationUnitId})
     </select>
     <select id="countActiveRoles" resultType="int">
-        SELECT count(*) FROM seal.admin_role WHERE active = TRUE AND role_id IN
-        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId, jdbcType=OTHER}</foreach>
+        SELECT count(*) FROM (
+            SELECT role_id FROM seal.admin_role WHERE active = TRUE AND role_id IN
+            <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId, jdbcType=OTHER}</foreach>
+            ORDER BY role_id FOR UPDATE
+        ) locked_roles
     </select>
     <select id="hasSystemAdminRole" resultType="boolean">
         SELECT EXISTS (

@@ -13,6 +13,8 @@ import java.util.UUID;
 @Mapper
 public interface RoleManagementMapper {
     List<RoleDetail> findRole(@Param("roleId") UUID roleId);
+    List<RoleDetail> findRoleForUpdate(@Param("roleId") UUID roleId);
+    boolean isSystemAdministrator(@Param("adminUserId") UUID adminUserId);
     List<PermissionSummary> findPermissions();
     Set<UUID> findAssignedPermissionIds(@Param("roleId") UUID roleId);
     Set<UUID> findRequiredSystemAdminPermissionIds();

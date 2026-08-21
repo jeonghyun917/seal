@@ -7,6 +7,25 @@
          WHERE role_id = #{roleId}
     </select>
 
+    <select id="findRoleForUpdate" resultType="kr.or.arte.seal.admin.application.role.RoleDetail">
+        SELECT role_id, role_code, role_name, system_role, active, version_no
+          FROM seal.admin_role
+         WHERE role_id = #{roleId}
+         FOR UPDATE
+    </select>
+
+    <select id="isSystemAdministrator" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1
+              FROM seal.user_role assignment
+              JOIN seal.admin_role role ON role.role_id = assignment.role_id
+             WHERE assignment.admin_user_id = #{adminUserId}
+               AND assignment.active = TRUE
+               AND role.active = TRUE
+               AND role.role_code = 'SYSTEM_ADMIN'
+        )
+    </select>
+
     <select id="findPermissions" resultType="kr.or.arte.seal.admin.application.role.PermissionSummary">
         SELECT permission_id, permission_code, permission_name, description
           FROM seal.permission

@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -109,7 +110,7 @@ class AdminReferencePagesControllerTest {
 
     @Test
     void permittedUserCanOpenRoleCreationForm() throws Exception {
-        mockMvc.perform(get("/admin/roles/new").with(authentication(admin("ROLE_MANAGE"))))
+        mockMvc.perform(get("/admin/roles/new").with(authentication(systemAdmin())))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/roles/form"))
                 .andExpect(model().attributeExists("roleForm", "permissions"));
@@ -117,7 +118,7 @@ class AdminReferencePagesControllerTest {
 
     @Test
     void roleCreationRequiresCsrf() throws Exception {
-        mockMvc.perform(post("/admin/roles").with(authentication(admin("ROLE_MANAGE"))))
+        mockMvc.perform(post("/admin/roles").with(authentication(systemAdmin())))
                 .andExpect(status().isForbidden());
     }
 
@@ -125,12 +126,33 @@ class AdminReferencePagesControllerTest {
     void validRoleFormCreatesAndRedirects() throws Exception {
         UUID roleId = UUID.fromString("40000000-0000-0000-0000-000000000010");
         given(roleManagement.create(any())).willReturn(roleId);
-        mockMvc.perform(post("/admin/roles").with(authentication(admin("ROLE_MANAGE"))).with(csrf())
+        mockMvc.perform(post("/admin/roles").with(authentication(systemAdmin())).with(csrf())
                         .param("roleCode", "REQUEST_OPERATOR")
                         .param("roleName", "요청 담당자")
                         .param("permissionIds", "50000000-0000-0000-0000-000000000001"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/roles/" + roleId + "?created"));
+    }
+
+    @Test
+    void customRoleHolderCannotChangeRoleComposition() throws Exception {
+        mockMvc.perform(get("/admin/roles/new")
+                        .with(authentication(admin("ROLE_VIEW", "ROLE_MANAGE"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invalidPermissionSelectionReturnsRoleFormWithError() throws Exception {
+        willThrow(new IllegalArgumentException("존재하는 권한을 선택해야 합니다."))
+                .given(roleManagement).create(any());
+
+        mockMvc.perform(post("/admin/roles").with(authentication(systemAdmin())).with(csrf())
+                        .param("roleCode", "REQUEST_OPERATOR")
+                        .param("roleName", "요청 담당자")
+                        .param("permissionIds", "50000000-0000-0000-0000-000000000099"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/roles/form"))
+                .andExpect(model().attributeHasFieldErrors("roleForm", "permissionIds"));
     }
 
     @Test
@@ -141,7 +163,7 @@ class AdminReferencePagesControllerTest {
                 .andExpect(model().attributeExists("events"));
     }
 
-    private static UsernamePasswordAuthenticationToken admin(String authority) {
+    private static UsernamePasswordAuthenticationToken admin(String... authorities) {
         AdminPrincipal principal = new AdminPrincipal(
                 UUID.fromString("20000000-0000-0000-0000-000000000001"),
                 "test-admin",
@@ -152,7 +174,11 @@ class AdminReferencePagesControllerTest {
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,
                 null,
-                List.of(new SimpleGrantedAuthority(authority))
+                java.util.Arrays.stream(authorities).map(SimpleGrantedAuthority::new).toList()
         );
+    }
+
+    private static UsernamePasswordAuthenticationToken systemAdmin() {
+        return admin("ROLE_SYSTEM_ADMIN", "ROLE_VIEW", "ROLE_MANAGE");
     }
 }

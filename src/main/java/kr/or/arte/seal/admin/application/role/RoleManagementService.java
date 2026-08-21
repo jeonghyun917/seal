@@ -47,6 +47,7 @@ public class RoleManagementService implements RoleManagement {
     @Override
     @Transactional
     public UUID create(RoleCreateCommand command) {
+        requireSystemAdministrator(command.actorId());
         validate(command.roleCode(), command.roleName(), command.permissionIds());
         if (mapper.countPermissions(command.permissionIds()) != command.permissionIds().size()) {
             throw new IllegalArgumentException("존재하는 권한을 선택해야 합니다.");
@@ -54,13 +55,15 @@ public class RoleManagementService implements RoleManagement {
         UUID id = UUID.randomUUID();
         if (mapper.insert(new RoleInsert(id, command.roleCode(), command.roleName().strip())) != 1) throw conflict();
         mapper.replacePermissions(id, command.permissionIds(), command.actorId());
-        audit("ROLE_CREATE", id, command.actorId());
+        audit("ROLE_CREATE", id, command.actorId(), Set.of(), command.permissionIds());
         return id;
     }
     @Override
     @Transactional
     public void update(RoleUpdateCommand command) {
-        RoleDetail role = findRole(command.roleId());
+        requireSystemAdministrator(command.actorId());
+        RoleDetail role = findRoleForUpdate(command.roleId());
+        Set<UUID> previousPermissionIds = mapper.findAssignedPermissionIds(role.roleId());
         validateName(command.roleName());
         if (command.permissionIds() == null || command.permissionIds().isEmpty()
                 || mapper.countPermissions(command.permissionIds()) != command.permissionIds().size()) {
@@ -76,7 +79,8 @@ public class RoleManagementService implements RoleManagement {
         if (mapper.update(new RoleUpdate(role.roleId(), command.roleName().strip(),
                 command.active(), command.versionNo())) != 1) throw conflict();
         mapper.replacePermissions(role.roleId(), command.permissionIds(), command.actorId());
-        audit("ROLE_UPDATE", role.roleId(), command.actorId());
+        audit("ROLE_UPDATE", role.roleId(), command.actorId(),
+                previousPermissionIds, command.permissionIds());
     }
     private static void validate(String code, String name, Set<UUID> permissions) {
         if (code == null || !CODE.matcher(code).matches()) throw new IllegalArgumentException("역할코드 형식이 올바르지 않습니다.");
@@ -86,9 +90,30 @@ public class RoleManagementService implements RoleManagement {
     private static void validateName(String name) {
         if (name == null || name.isBlank() || name.strip().length() > 100) throw new IllegalArgumentException("역할명은 1~100자로 입력해야 합니다.");
     }
-    private void audit(String action, UUID id, UUID actor) {
-        auditWriter.append(new AuditEventCommand(clock.instant(), "ADMIN", actor, action,
-                "ADMIN_ROLE", id.toString(), "SUCCESS", null, UUID.randomUUID(), Map.of()));
+    private RoleDetail findRoleForUpdate(UUID roleId) {
+        List<RoleDetail> rows = mapper.findRoleForUpdate(roleId);
+        if (rows.size() != 1) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return rows.get(0);
     }
-    private static ResponseStatusException conflict() { return new ResponseStatusException(HttpStatus.CONFLICT); }
+
+    private void requireSystemAdministrator(UUID actorId) {
+        if (!mapper.isSystemAdministrator(actorId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private void audit(String action, UUID id, UUID actor,
+            Set<UUID> beforePermissionIds, Set<UUID> afterPermissionIds) {
+        auditWriter.append(new AuditEventCommand(clock.instant(), "ADMIN", actor, action,
+                "ADMIN_ROLE", id.toString(), "SUCCESS", null, UUID.randomUUID(), Map.of(
+                        "beforePermissionIds", sortedIds(beforePermissionIds),
+                        "afterPermissionIds", sortedIds(afterPermissionIds))));
+    }
+    private static List<String> sortedIds(Set<UUID> ids) {
+        return ids.stream().map(UUID::toString).sorted().toList();
+    }
+    private static ResponseStatusException conflict() {
+        return new ResponseStatusException(HttpStatus.CONFLICT,
+                "다른 변경과 충돌했습니다. 최신 내용을 다시 불러온 뒤 재시도해 주세요.");
+    }
 }

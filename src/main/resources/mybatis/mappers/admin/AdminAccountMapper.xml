@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.admin.persistence.AdminAccountMapper">
+
+    <select id="findByLoginId" resultType="kr.or.arte.seal.admin.persistence.AdminAccountRow">
+        SELECT u.admin_user_id,
+               u.login_id,
+               u.display_name,
+               u.organization_unit_id,
+               u.password_hash,
+               u.account_status,
+               u.consecutive_failures,
+               u.locked_until,
+               u.must_change_password,
+               u.last_login_at,
+               u.version_no,
+               r.role_code,
+               p.permission_code
+          FROM seal.admin_user u
+          LEFT JOIN seal.user_role ur
+            ON ur.admin_user_id = u.admin_user_id
+          LEFT JOIN seal.admin_role r
+            ON r.role_id = ur.role_id
+           AND r.active = TRUE
+          LEFT JOIN seal.role_permission rp
+            ON rp.role_id = r.role_id
+          LEFT JOIN seal.permission p
+            ON p.permission_id = rp.permission_id
+         WHERE u.login_id = #{loginId}
+         ORDER BY r.role_code, p.permission_code
+    </select>
+
+    <update id="updateAuthenticationFailure">
+        UPDATE seal.admin_user
+           SET consecutive_failures = #{consecutiveFailures},
+               locked_until = #{lockedUntil, jdbcType=TIMESTAMP_WITH_TIMEZONE},
+               updated_at = CURRENT_TIMESTAMP,
+               version_no = version_no + 1
+         WHERE admin_user_id = #{adminUserId}
+           AND version_no = #{expectedVersion}
+    </update>
+
+    <update id="updateAuthenticationSuccess">
+        UPDATE seal.admin_user
+           SET consecutive_failures = 0,
+               locked_until = NULL,
+               last_login_at = #{loggedInAt},
+               updated_at = CURRENT_TIMESTAMP,
+               version_no = version_no + 1
+         WHERE admin_user_id = #{adminUserId}
+           AND version_no = #{expectedVersion}
+    </update>
+</mapper>

@@ -162,6 +162,7 @@ git commit -m "feat: add administrator credential policies"
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AdminAccountRepository.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AdminAuthenticationService.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AuthenticationResult.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/application/AuthenticationStatus.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/persistence/AdminAccountRow.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/persistence/AdminAccountMapper.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/persistence/MyBatisAdminAccountRepository.java`
@@ -169,14 +170,17 @@ git commit -m "feat: add administrator credential policies"
 - Create: `src/main/java/kr/or/arte/seal/audit/application/AuditEventWriter.java`
 - Create: `src/main/java/kr/or/arte/seal/audit/application/AuditEventCommand.java`
 - Create: `src/main/java/kr/or/arte/seal/audit/persistence/AuditEventMapper.java`
+- Create: `src/main/java/kr/or/arte/seal/audit/persistence/AuditEventRow.java`
+- Create: `src/main/java/kr/or/arte/seal/audit/persistence/MyBatisAuditEventWriter.java`
 - Create: `src/main/resources/mybatis/mappers/audit/AuditEventMapper.xml`
 - Create: `src/test/java/kr/or/arte/seal/admin/application/AdminAuthenticationServiceTest.java`
+- Create: `src/test/java/kr/or/arte/seal/admin/persistence/MyBatisAdminAccountRepositoryTest.java`
 
 **Interfaces:**
 - Consumes: Task 2 domain rules and Spring `PasswordEncoder`.
 - Produces: `AdminAuthenticationService.authenticate(String, String, Instant): AuthenticationResult`, repository update methods, and `AuditEventWriter.append(AuditEventCommand)`.
 
-- [ ] **Step 1: Write failing authentication-service tests using an in-test repository fake**
+- [x] **Step 1: Write failing authentication-service tests using an in-test repository fake**
 
 Cover these behaviors separately:
 
@@ -219,33 +223,33 @@ void unknownLoginUsesSamePublicFailureResult() {
 
 The production change that makes each test fail is the missing `AdminAuthenticationService` behavior, not a mock expectation.
 
-- [ ] **Step 2: Run service tests and verify RED**
+- [x] **Step 2: Run service tests and verify RED**
 
 Run: `./mvnw.cmd -Dtest=AdminAuthenticationServiceTest test`
 
 Expected: test compilation fails because the service and ports do not exist.
 
-- [ ] **Step 3: Implement minimal service and repository port**
+- [x] **Step 3: Implement minimal service and repository port**
 
 The service normalizes login IDs with `Locale.ROOT`, checks temporary lock before `PasswordEncoder.matches`, records success or failure through the port, returns one public invalid-credentials result for unknown and incorrect accounts, and writes audit events without password data.
 
-- [ ] **Step 4: Run service tests and verify GREEN**
+- [x] **Step 4: Run service tests and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=AdminAuthenticationServiceTest test`
 
 Expected: PASS for success, invalid credentials, fifth-failure lock, active lock, and unknown account.
 
-- [ ] **Step 5: Implement MyBatis and audit adapters**
+- [x] **Step 5: Implement MyBatis and audit adapters**
 
 Use bound `#{}` parameters only. Account lookup joins active role and permission codes. Failure and success updates include `WHERE version_no = #{expectedVersion}` and increment `version_no`. Audit insert accepts only pre-sanitized metadata JSON.
 
-- [ ] **Step 6: Compile all production adapters**
+- [x] **Step 6: Compile all production adapters**
 
 Run: `./mvnw.cmd -DskipTests compile`
 
 Expected: BUILD SUCCESS with mapper interfaces and XML resources packaged.
 
-- [ ] **Step 7: Commit ports and adapters**
+- [x] **Step 7: Commit ports and adapters**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/admin src/main/java/kr/or/arte/seal/audit src/main/resources/mybatis src/test/java/kr/or/arte/seal/admin

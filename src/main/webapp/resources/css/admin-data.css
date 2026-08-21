@@ -37,4 +37,7 @@
 .version-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; color: #52647d; }
 .reject-form { display: flex; align-items: center; gap: 8px; }
 .reject-form input { min-height: 42px; padding: 0 10px; border: 1px solid #bdcadc; border-radius: 8px; }
+.choice-field { display: grid; gap: 8px; padding: 14px; border: 1px solid #dce4ef; border-radius: 10px; }
+.choice-field legend { padding: 0 6px; font-weight: 800; color: #24364f; }
+.action-panel { margin-top: 18px; }
 @media (max-width: 700px) { .data-form { grid-template-columns: 1fr; } .version-heading { flex-direction: column; } }

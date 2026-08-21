@@ -7,6 +7,7 @@
               FROM seal.user_scope
              WHERE admin_user_id = #{adminUserId}
                AND scope_type = 'ORGANIZATION'
+               AND active = TRUE
             UNION
             SELECT child.organization_unit_id, TRUE
               FROM seal.organization_unit child
@@ -27,7 +28,7 @@
                count(DISTINCT user_role.admin_user_id) AS user_count,
                count(DISTINCT role_permission.permission_id) AS permission_count
           FROM seal.admin_role role
-          LEFT JOIN seal.user_role user_role ON user_role.role_id = role.role_id
+          LEFT JOIN seal.user_role user_role ON user_role.role_id = role.role_id AND user_role.active = TRUE
           LEFT JOIN seal.role_permission role_permission ON role_permission.role_id = role.role_id
          GROUP BY role.role_id, role.role_code, role.role_name, role.system_role, role.active
          ORDER BY role.system_role DESC, role.role_code

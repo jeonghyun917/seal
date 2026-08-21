@@ -21,6 +21,7 @@
           FROM seal.admin_user u
           LEFT JOIN seal.user_role ur
             ON ur.admin_user_id = u.admin_user_id
+           AND ur.active = TRUE
           LEFT JOIN seal.admin_role r
             ON r.role_id = ur.role_id
            AND r.active = TRUE
@@ -49,6 +50,7 @@
           FROM seal.admin_user u
           LEFT JOIN seal.user_role ur
             ON ur.admin_user_id = u.admin_user_id
+           AND ur.active = TRUE
           LEFT JOIN seal.admin_role r
             ON r.role_id = ur.role_id
            AND r.active = TRUE

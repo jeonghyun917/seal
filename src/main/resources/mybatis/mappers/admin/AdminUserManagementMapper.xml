@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.admin.persistence.user.AdminUserManagementMapper">
+    <sql id="visibleScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{actorId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+    <select id="findVisibleUsers" resultType="kr.or.arte.seal.admin.application.user.AdminUserSummary">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+        SELECT DISTINCT user_account.admin_user_id, user_account.login_id, user_account.display_name,
+               organization.organization_name, user_account.account_status,
+               user_account.consecutive_failures, user_account.locked_until, user_account.last_login_at
+          FROM seal.admin_user user_account
+          JOIN visible_scope scope ON scope.organization_unit_id = user_account.organization_unit_id
+          JOIN seal.organization_unit organization ON organization.organization_unit_id = user_account.organization_unit_id
+         ORDER BY user_account.display_name, user_account.login_id
+    </select>
+    <select id="findVisibleUser" resultType="kr.or.arte.seal.admin.application.user.AdminUserDetail">
+        <include refid="visibleScope"/>
+        SELECT user_account.admin_user_id, user_account.login_id, user_account.display_name,
+               user_account.organization_unit_id, organization.organization_name,
+               user_account.account_status, user_account.consecutive_failures,
+               user_account.locked_until, user_account.must_change_password, user_account.version_no
+          FROM seal.admin_user user_account
+          JOIN visible_scope scope ON scope.organization_unit_id = user_account.organization_unit_id
+          JOIN seal.organization_unit organization ON organization.organization_unit_id = user_account.organization_unit_id
+         WHERE user_account.admin_user_id = #{adminUserId}
+    </select>
+    <select id="canAccessOrganization" resultType="boolean">
+        <include refid="visibleScope"/>
+        SELECT EXISTS (SELECT 1 FROM visible_scope WHERE organization_unit_id = #{organizationUnitId})
+    </select>
+    <select id="countActiveRoles" resultType="int">
+        SELECT count(*) FROM seal.admin_role WHERE active = TRUE AND role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId, jdbcType=OTHER}</foreach>
+    </select>
+    <select id="hasSystemAdminRole" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM seal.user_role assignment
+              JOIN seal.admin_role role ON role.role_id = assignment.role_id
+             WHERE assignment.admin_user_id = #{adminUserId} AND assignment.active = TRUE
+               AND role.active = TRUE AND role.role_code = 'SYSTEM_ADMIN'
+        )
+    </select>
+    <select id="includesSystemAdminRole" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM seal.admin_role
+             WHERE active = TRUE AND role_code = 'SYSTEM_ADMIN' AND role_id IN
+            <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId, jdbcType=OTHER}</foreach>
+        )
+    </select>
+    <select id="countActiveSystemAdministrators" resultType="int">
+        SELECT count(DISTINCT user_account.admin_user_id)
+          FROM seal.admin_user user_account
+          JOIN seal.user_role assignment ON assignment.admin_user_id = user_account.admin_user_id
+                                    AND assignment.active = TRUE
+          JOIN seal.admin_role role ON role.role_id = assignment.role_id
+                              AND role.active = TRUE AND role.role_code = 'SYSTEM_ADMIN'
+         WHERE user_account.account_status &lt;&gt; 'INACTIVE'
+    </select>
+    <insert id="insert">
+        INSERT INTO seal.admin_user (admin_user_id, login_id, display_name, organization_unit_id,
+            password_hash, account_status, must_change_password, created_by, updated_by)
+        VALUES (#{adminUserId}, #{loginId}, #{displayName}, #{organizationUnitId},
+            #{passwordHash}, 'ACTIVE', TRUE, #{actorId}, #{actorId})
+    </insert>
+    <update id="deactivateRolesNotIn">
+        UPDATE seal.user_role SET active = FALSE, revoked_at = CURRENT_TIMESTAMP, revoked_by = #{actorId}
+         WHERE admin_user_id = #{adminUserId} AND active = TRUE AND role_id NOT IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">#{roleId, jdbcType=OTHER}</foreach>
+    </update>
+    <insert id="upsertRoles">
+        INSERT INTO seal.user_role (admin_user_id, role_id, assigned_by, active)
+        VALUES
+        <foreach collection="roleIds" item="roleId" separator=",">
+            (#{adminUserId}, #{roleId, jdbcType=OTHER}, #{actorId}, TRUE)
+        </foreach>
+        ON CONFLICT (admin_user_id, role_id) DO UPDATE
+           SET active = TRUE, assigned_by = EXCLUDED.assigned_by,
+               assigned_at = CURRENT_TIMESTAMP, revoked_at = NULL, revoked_by = NULL
+    </insert>
+    <update id="deactivateOrganizationScopesNotIn">
+        UPDATE seal.user_scope SET active = FALSE, revoked_at = CURRENT_TIMESTAMP, revoked_by = #{actorId}
+         WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+           AND scope_target_id NOT IN
+        <foreach collection="scopeIds" item="scopeId" open="(" separator="," close=")">#{scopeId, jdbcType=OTHER}</foreach>
+    </update>
+    <insert id="upsertOrganizationScopes">
+        INSERT INTO seal.user_scope (user_scope_id, admin_user_id, scope_type,
+            scope_target_id, include_descendants, assigned_by, active)
+        VALUES
+        <foreach collection="scopeIds" item="scopeId" separator=",">
+            (gen_random_uuid(), #{adminUserId}, 'ORGANIZATION', #{scopeId, jdbcType=OTHER}, TRUE, #{actorId}, TRUE)
+        </foreach>
+        ON CONFLICT (admin_user_id, scope_type, scope_target_id) DO UPDATE
+           SET active = TRUE, include_descendants = TRUE, assigned_by = EXCLUDED.assigned_by,
+               assigned_at = CURRENT_TIMESTAMP, revoked_at = NULL, revoked_by = NULL
+    </insert>
+    <update id="update">
+        UPDATE seal.admin_user SET display_name = #{displayName},
+               organization_unit_id = #{organizationUnitId}, account_status = #{accountStatus},
+               updated_by = #{actorId}, updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE admin_user_id = #{adminUserId} AND version_no = #{versionNo}
+    </update>
+    <update id="unlock">
+        UPDATE seal.admin_user SET account_status = 'ACTIVE', consecutive_failures = 0,
+               locked_until = NULL, updated_by = #{actorId}, updated_at = CURRENT_TIMESTAMP,
+               version_no = version_no + 1
+         WHERE admin_user_id = #{adminUserId} AND version_no = #{versionNo}
+    </update>
+    <update id="resetPassword">
+        UPDATE seal.admin_user SET password_hash = #{passwordHash}, must_change_password = TRUE,
+               account_status = 'ACTIVE', consecutive_failures = 0, locked_until = NULL,
+               updated_by = #{actorId}, updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE admin_user_id = #{adminUserId} AND version_no = #{versionNo}
+    </update>
+    <select id="findAssignedRoleIds" resultType="java.util.UUID">
+        SELECT role_id FROM seal.user_role WHERE admin_user_id = #{adminUserId} AND active = TRUE ORDER BY role_id
+    </select>
+    <select id="findAssignedOrganizationScopeIds" resultType="java.util.UUID">
+        SELECT scope_target_id FROM seal.user_scope
+         WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+         ORDER BY scope_target_id
+    </select>
+</mapper>

@@ -4,7 +4,7 @@
     <select id="canAccessOrganization" resultType="boolean">
         WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
             SELECT scope_target_id, include_descendants FROM seal.user_scope
-             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION'
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
             UNION
             SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
               JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
@@ -29,7 +29,7 @@
     <select id="findVisibleVersionForUpdate" resultType="kr.or.arte.seal.policy.domain.retention.RetentionPolicyVersion">
         WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
             SELECT scope_target_id, include_descendants FROM seal.user_scope
-             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION'
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION' AND active = TRUE
             UNION
             SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
               JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id

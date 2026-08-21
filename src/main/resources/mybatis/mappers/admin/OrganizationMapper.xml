@@ -10,6 +10,7 @@
               FROM seal.user_scope
              WHERE admin_user_id = #{adminUserId}
                AND scope_type = 'ORGANIZATION'
+               AND active = TRUE
             UNION
             SELECT child.organization_unit_id, TRUE
               FROM seal.organization_unit child

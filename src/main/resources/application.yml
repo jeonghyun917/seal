@@ -31,6 +31,7 @@ spring:
 mybatis:
   mapper-locations: classpath*:/mybatis/mappers/**/*.xml
   type-aliases-package: kr.or.arte.seal
+  type-handlers-package: kr.or.arte.seal.common.persistence
   configuration:
     map-underscore-to-camel-case: true
     jdbc-type-for-null: NULL

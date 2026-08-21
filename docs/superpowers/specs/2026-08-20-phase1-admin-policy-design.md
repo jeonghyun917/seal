@@ -1,6 +1,6 @@
 # 1단계 관리자 인증·정책 관리 설계
 
-**상위 기준:** `docs/superpowers/specs/2026-08-20-consent-system-mvp-design.md`  
+**상위 기준:** `docs/superpowers/specs/2026-08-21-consent-system-full-build-design.md`
 **개발 단계:** 1단계 보안·정책 기반  
 **상태:** 구현 설계
 

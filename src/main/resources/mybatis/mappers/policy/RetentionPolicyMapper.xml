@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.policy.persistence.RetentionPolicyMapper">
+    <select id="canAccessOrganization" resultType="boolean">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION'
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+        SELECT EXISTS (SELECT 1 FROM visible_scope WHERE organization_unit_id = #{organizationUnitId})
+    </select>
+    <insert id="insertPolicy">
+        INSERT INTO seal.retention_policy (retention_policy_id, policy_code, policy_name,
+            owner_organization_unit_id, policy_status, created_by, updated_by)
+        VALUES (#{retentionPolicyId}, #{policyCode}, #{policyName}, #{ownerOrganizationUnitId},
+            'ACTIVE', #{actorId}, #{actorId})
+    </insert>
+    <insert id="insertVersion">
+        INSERT INTO seal.retention_policy_version (retention_policy_version_id, retention_policy_id,
+            version_number, workflow_status, start_event, period_value, period_unit,
+            grace_period_days, destruction_method, created_by, updated_by)
+        VALUES (#{retentionPolicyVersionId}, #{retentionPolicyId}, #{versionNumber}, 'DRAFT',
+            #{startEvent}, #{periodValue}, #{periodUnit}, #{gracePeriodDays},
+            #{destructionMethod}, #{actorId}, #{actorId})
+    </insert>
+    <select id="findVisibleVersionForUpdate" resultType="kr.or.arte.seal.policy.domain.retention.RetentionPolicyVersion">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{adminUserId} AND scope_type = 'ORGANIZATION'
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+        SELECT version.retention_policy_version_id, version.retention_policy_id,
+               version.version_number, version.workflow_status, version.start_event,
+               version.period_value, version.period_unit, version.grace_period_days,
+               version.destruction_method, version.created_by, version.review_requested_by,
+               version.approved_by, version.rejection_comment, version.version_no
+          FROM seal.retention_policy_version version
+          JOIN seal.retention_policy policy ON policy.retention_policy_id = version.retention_policy_id
+          JOIN visible_scope scope ON scope.organization_unit_id = policy.owner_organization_unit_id
+         WHERE version.retention_policy_id = #{retentionPolicyId}
+           AND version.retention_policy_version_id = #{retentionPolicyVersionId}
+         FOR UPDATE
+    </select>
+    <update id="updateVersionTransition">
+        UPDATE seal.retention_policy_version
+           SET workflow_status = #{version.workflowStatus},
+               review_requested_by = #{version.reviewRequestedBy, jdbcType=OTHER},
+               review_requested_at = CASE WHEN #{version.workflowStatus} = 'REVIEW_REQUESTED' THEN #{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE} WHEN #{version.workflowStatus} = 'DRAFT' THEN NULL ELSE review_requested_at END,
+               approved_by = #{version.approvedBy, jdbcType=OTHER},
+               approved_at = CASE WHEN #{version.workflowStatus} = 'APPROVED' THEN CAST(#{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE} AS TIMESTAMPTZ) ELSE NULL::TIMESTAMPTZ END,
+               rejection_comment = #{version.rejectionComment, jdbcType=VARCHAR},
+               updated_by = #{actorId}, updated_at = #{occurredAt, jdbcType=TIMESTAMP_WITH_TIMEZONE}, version_no = version_no + 1
+         WHERE retention_policy_version_id = #{version.retentionPolicyVersionId}
+           AND version_no = #{version.versionNo}
+    </update>
+    <update id="supersedePreviousApprovedVersions">
+        UPDATE seal.retention_policy_version SET workflow_status = 'SUPERSEDED',
+               updated_by = #{actorId}, updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE retention_policy_id = #{retentionPolicyId}
+           AND retention_policy_version_id &lt;&gt; #{approvedVersionId}
+           AND workflow_status = 'APPROVED'
+    </update>
+    <update id="updateCurrentApprovedVersion">
+        UPDATE seal.retention_policy SET current_approved_version_id = #{approvedVersionId},
+               updated_by = #{actorId}, updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
+         WHERE retention_policy_id = #{retentionPolicyId}
+    </update>
+</mapper>

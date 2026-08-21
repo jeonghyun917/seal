@@ -5,4 +5,6 @@ import java.util.UUID;
 
 public interface RetentionPolicyQuery {
     List<RetentionPolicySummary> findVisiblePolicies(UUID adminUserId);
+    RetentionPolicyDetail findVisiblePolicy(UUID adminUserId, UUID retentionPolicyId);
+    List<RetentionPolicyVersionView> findVisibleVersions(UUID adminUserId, UUID retentionPolicyId);
 }

@@ -27,3 +27,14 @@
 .data-table tbody tr:hover {
     background: #f8faff;
 }
+
+.data-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.data-form select, .data-form input { min-height: 46px; padding: 0 12px; border: 1px solid #bdcadc; border-radius: 8px; background: #fff; }
+.form-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; grid-column: 1 / -1; margin-top: 12px; }
+.form-actions form { margin: 0; }
+.field-error { color: #a3262d; font-size: .8rem; }
+.version-card { margin-top: 14px; padding: 20px; border: 1px solid #dce4ef; border-radius: 12px; }
+.version-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 16px; color: #52647d; }
+.reject-form { display: flex; align-items: center; gap: 8px; }
+.reject-form input { min-height: 42px; padding: 0 10px; border: 1px solid #bdcadc; border-radius: 8px; }
+@media (max-width: 700px) { .data-form { grid-template-columns: 1fr; } .version-heading { flex-direction: column; } }

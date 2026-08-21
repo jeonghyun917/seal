@@ -335,6 +335,9 @@ git commit -m "feat: integrate database administrator security"
 - Create: `src/main/java/kr/or/arte/seal/admin/web/AdminHomeController.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/web/PasswordChangeController.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/application/AdminPasswordChangeService.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/application/AdminPasswordRepository.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/application/PasswordChangeResult.java`
+- Create: `src/main/java/kr/or/arte/seal/admin/application/PasswordChangeStatus.java`
 - Create: `src/main/java/kr/or/arte/seal/admin/config/MustChangePasswordFilter.java`
 - Create: `src/main/webapp/WEB-INF/jsp/admin/login.jsp`
 - Create: `src/main/webapp/WEB-INF/jsp/admin/home.jsp`
@@ -344,12 +347,13 @@ git commit -m "feat: integrate database administrator security"
 - Modify: `src/main/webapp/resources/css/app.css`
 - Modify: `src/test/java/kr/or/arte/seal/common/config/SecurityIntegrationTest.java`
 - Create: `src/test/java/kr/or/arte/seal/admin/web/AdminSecurityMvcTest.java`
+- Create: `src/test/java/kr/or/arte/seal/admin/application/AdminPasswordChangeServiceTest.java`
 
 **Interfaces:**
 - Consumes: authenticated `AdminPrincipal`, password policy, password encoder, and repository update port.
 - Produces: `/login`, `/admin`, and `/account/password/change` JSP workflows.
 
-- [ ] **Step 1: Write failing MVC security tests**
+- [x] **Step 1: Write failing MVC security tests**
 
 ```java
 @Test
@@ -389,29 +393,29 @@ void normalAdministratorCanOpenAdminHome() throws Exception {
 }
 ```
 
-- [ ] **Step 2: Run MVC tests and verify RED**
+- [x] **Step 2: Run MVC tests and verify RED**
 
 Run: `./mvnw.cmd -Dtest=AdminSecurityMvcTest test`
 
 Expected: FAIL because custom routes, views, and password-change enforcement are missing.
 
-- [ ] **Step 3: Implement controllers, JSPs, filter, and security rules**
+- [x] **Step 3: Implement controllers, JSPs, filter, and security rules**
 
 Use a generic login error message, retain CSRF, keep public home/status/consent routes, redirect successful login with `mustChangePassword=true` to `/account/password/change`, invalidate the session after password change, and apply existing CSP/no-referrer/frame-deny headers.
 
-- [ ] **Step 4: Run MVC tests and verify GREEN**
+- [x] **Step 4: Run MVC tests and verify GREEN**
 
 Run: `./mvnw.cmd -Dtest=AdminSecurityMvcTest test`
 
 Expected: PASS for public login, protected admin, CSRF, forced change, and normal access.
 
-- [ ] **Step 5: Run existing security regression tests**
+- [x] **Step 5: Run existing security regression tests**
 
 Run: `./mvnw.cmd -Dtest=SecurityIntegrationTest,HomeControllerTest test`
 
 Expected: PASS; JSP forwards and public pages remain accessible.
 
-- [ ] **Step 6: Commit the administrator UI shell**
+- [x] **Step 6: Commit the administrator UI shell**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/admin src/main/webapp src/test/java/kr/or/arte/seal

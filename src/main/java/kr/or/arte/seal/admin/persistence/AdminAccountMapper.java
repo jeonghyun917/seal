@@ -12,6 +12,8 @@ public interface AdminAccountMapper {
 
     List<AdminAccountRow> findByLoginId(@Param("loginId") String loginId);
 
+    List<AdminAccountRow> findById(@Param("adminUserId") UUID adminUserId);
+
     int updateAuthenticationFailure(
             @Param("adminUserId") UUID adminUserId,
             @Param("consecutiveFailures") int consecutiveFailures,
@@ -22,6 +24,13 @@ public interface AdminAccountMapper {
     int updateAuthenticationSuccess(
             @Param("adminUserId") UUID adminUserId,
             @Param("loggedInAt") Instant loggedInAt,
+            @Param("expectedVersion") long expectedVersion
+    );
+
+    int updatePassword(
+            @Param("adminUserId") UUID adminUserId,
+            @Param("passwordHash") String passwordHash,
+            @Param("mustChangePassword") boolean mustChangePassword,
             @Param("expectedVersion") long expectedVersion
     );
 }

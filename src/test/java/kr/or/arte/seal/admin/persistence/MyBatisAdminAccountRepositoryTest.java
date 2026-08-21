@@ -83,6 +83,11 @@ class MyBatisAdminAccountRepositoryTest {
         }
 
         @Override
+        public List<AdminAccountRow> findById(UUID adminUserId) {
+            return rows;
+        }
+
+        @Override
         public int updateAuthenticationFailure(
                 UUID adminUserId,
                 int consecutiveFailures,
@@ -97,6 +102,16 @@ class MyBatisAdminAccountRepositoryTest {
 
         @Override
         public int updateAuthenticationSuccess(UUID adminUserId, Instant loggedInAt, long expectedVersion) {
+            return 1;
+        }
+
+        @Override
+        public int updatePassword(
+                UUID adminUserId,
+                String passwordHash,
+                boolean mustChangePassword,
+                long expectedVersion
+        ) {
             return 1;
         }
     }

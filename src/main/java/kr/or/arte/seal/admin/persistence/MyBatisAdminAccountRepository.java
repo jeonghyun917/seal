@@ -1,6 +1,7 @@
 package kr.or.arte.seal.admin.persistence;
 
 import kr.or.arte.seal.admin.application.AdminAccountRepository;
+import kr.or.arte.seal.admin.application.AdminPasswordRepository;
 import kr.or.arte.seal.admin.domain.AdminAccount;
 import kr.or.arte.seal.admin.domain.AdminAccountStatus;
 import kr.or.arte.seal.admin.domain.LoginFailureResult;
@@ -14,7 +15,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 @Repository
-public class MyBatisAdminAccountRepository implements AdminAccountRepository {
+public class MyBatisAdminAccountRepository implements AdminAccountRepository, AdminPasswordRepository {
 
     private final AdminAccountMapper mapper;
 
@@ -24,7 +25,15 @@ public class MyBatisAdminAccountRepository implements AdminAccountRepository {
 
     @Override
     public Optional<AdminAccount> findByLoginId(String normalizedLoginId) {
-        List<AdminAccountRow> rows = mapper.findByLoginId(normalizedLoginId);
+        return aggregate(mapper.findByLoginId(normalizedLoginId));
+    }
+
+    @Override
+    public Optional<AdminAccount> findById(UUID adminUserId) {
+        return aggregate(mapper.findById(adminUserId));
+    }
+
+    private static Optional<AdminAccount> aggregate(List<AdminAccountRow> rows) {
         if (rows.isEmpty()) {
             return Optional.empty();
         }
@@ -75,5 +84,20 @@ public class MyBatisAdminAccountRepository implements AdminAccountRepository {
     @Override
     public boolean recordAuthenticationSuccess(UUID adminUserId, Instant loggedInAt, long expectedVersion) {
         return mapper.updateAuthenticationSuccess(adminUserId, loggedInAt, expectedVersion) == 1;
+    }
+
+    @Override
+    public boolean updatePassword(
+            UUID adminUserId,
+            String passwordHash,
+            boolean mustChangePassword,
+            long expectedVersion
+    ) {
+        return mapper.updatePassword(
+                adminUserId,
+                passwordHash,
+                mustChangePassword,
+                expectedVersion
+        ) == 1;
     }
 }

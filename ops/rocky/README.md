@@ -44,7 +44,7 @@ Tomcat 실행 계정만 `/var/lib/seal/documents`와 `/var/log/seal`에 접근�
 2. `database` 폴더의 미적용 SQL을 검토하고 수동 적용한다.
 3. 기존 WAR를 서버 외부 또는 승인된 배포 보관소에 보존한다.
 4. 새 `seal.war`를 Tomcat `webapps`에 반영한다.
-5. Tomcat 재기동 후 `http://127.0.0.1:8080/actuator/health`를 확인한다.
+5. Tomcat Connector가 localhost의 `9090` 포트를 사용하도록 설정한 뒤 재기동하고 `http://127.0.0.1:9090/actuator/health`를 확인한다.
 6. Nginx 경유 HTTPS 화면과 CSP, 쿠키, 리다이렉트를 확인한다.
 7. 운영 승인된 테스트 주소로 이메일 한 건을 발송한다.
 
@@ -53,12 +53,12 @@ Tomcat 실행 계정만 `/var/lib/seal/documents`와 `/var/log/seal`에 접근�
 | 방향 | 포트 | 용도 |
 |---|---:|---|
 | 외부 → Nginx | 443/TCP | 관리자 및 정보주체 HTTPS |
-| Nginx → Tomcat | 8080/TCP, localhost | 내부 리버스 프록시 |
+| Nginx → Tomcat | 9090/TCP, localhost | 내부 리버스 프록시 |
 | 애플리케이션 → PostgreSQL | 5432/TCP, localhost | DB 연결 |
 | 애플리케이션 → SMTP | 465/TCP | SSL/TLS SMTP 릴레이 |
 | 서버 → DNS/NTP | 기관 정책 | 이름 해석과 시간 동기화 |
 
-Tomcat 8080과 PostgreSQL 5432는 외부에 공개하지 않는다.
+Tomcat 9090과 PostgreSQL 5432는 외부에 공개하지 않는다.
 
 ## 롤백
 

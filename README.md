@@ -70,11 +70,11 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 
 브라우저 확인:
 
-- `http://localhost:8080/`
-- `http://localhost:8080/system/status`
-- `http://localhost:8080/login`
-- `http://localhost:8080/admin`
-- `http://localhost:8080/actuator/health`
+- `http://localhost:9090/`
+- `http://localhost:9090/system/status`
+- `http://localhost:9090/login`
+- `http://localhost:9090/admin`
+- `http://localhost:9090/actuator/health`
 
 로컬 프로필에서는 실제 메일 발송이 비활성화된다. SMTP 테스트는 Rocky Linux 공인 IP 등록 후 승인된 수신 주소로만 수행한다.
 

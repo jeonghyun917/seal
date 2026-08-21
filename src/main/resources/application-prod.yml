@@ -10,6 +10,7 @@ spring:
       maximum-pool-size: ${SEAL_DB_POOL_MAX:20}
       minimum-idle: ${SEAL_DB_POOL_MIN:5}
 server:
+  port: ${SEAL_SERVER_PORT:9090}
   servlet:
     session:
       cookie:

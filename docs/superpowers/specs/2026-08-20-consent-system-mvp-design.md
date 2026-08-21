@@ -103,7 +103,7 @@
     │ HTTPS 443
     ▼
 Nginx
-    │ localhost:8080
+    │ localhost:9090
     ▼
 Tomcat 10.1 / seal.war
     ├─ 관리자 JSP
@@ -120,7 +120,7 @@ Tomcat 10.1 / seal.war
 최종 백업: 서버 외부 승인 저장소
 ```
 
-로컬 개발은 `http://localhost:8080`을 사용한다. 로컬 프로필에서는 SMTP 발송을 비활성화하고 보안 쿠키의 `secure` 속성을 끈다. HTTPS, 운영 도메인과 SMTP 실발송은 운영 준비 단계에서만 적용한다.
+로컬 개발은 `http://localhost:9090`을 사용한다. 로컬 프로필에서는 SMTP 발송을 비활성화하고 보안 쿠키의 `secure` 속성을 끈다. HTTPS, 운영 도메인과 SMTP 실발송은 운영 준비 단계에서만 적용한다.
 
 ## 6. 모듈 경계
 

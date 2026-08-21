@@ -30,7 +30,7 @@
 Internet
    │ HTTPS 443
 Nginx
-   │ localhost:8080
+   │ localhost:9090
 Tomcat 10.1 / seal.war
    ├─ JSP 관리자 화면
    ├─ 모바일 동의 화면

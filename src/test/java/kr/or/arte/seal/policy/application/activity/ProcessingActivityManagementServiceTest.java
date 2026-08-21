@@ -4,6 +4,8 @@ import kr.or.arte.seal.audit.application.AuditEventWriter;
 import kr.or.arte.seal.policy.domain.activity.LegalBasisType;
 import kr.or.arte.seal.policy.domain.activity.ProcessingDataItem;
 import kr.or.arte.seal.policy.persistence.activity.ProcessingActivityMapper;
+import kr.or.arte.seal.policy.persistence.activity.ProcessingActivityVersionRow;
+import kr.or.arte.seal.policy.domain.activity.ProcessingWorkflowStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
@@ -64,6 +66,29 @@ class ProcessingActivityManagementServiceTest {
                         .isEqualTo(404));
 
         verify(mapper, never()).insertActivity(any());
+    }
+
+    @Test
+    void approvalRejectsRetentionVersionSupersededAfterDraftCreation() {
+        UUID activityId = UUID.fromString("80000000-0000-0000-0000-000000000001");
+        UUID versionId = UUID.fromString("81000000-0000-0000-0000-000000000001");
+        UUID reviewerId = UUID.fromString("20000000-0000-0000-0000-000000000002");
+        given(mapper.findVisibleVersionForUpdate(reviewerId, activityId, versionId)).willReturn(List.of(
+                new ProcessingActivityVersionRow(versionId, activityId, 1,
+                        ProcessingWorkflowStatus.REVIEW_REQUESTED,
+                        "교육 프로그램 참여자를 등록하고 운영하기 위한 목적입니다.",
+                        LegalBasisType.CONSENT, "정보주체의 개인정보 수집·이용 동의",
+                        POLICY_VERSION_ID, ACTOR_ID, ACTOR_ID, null, null, 1)));
+        given(mapper.findDataItems(versionId)).willReturn(List.of(
+                new ProcessingDataItem("성명", "참여자 식별", true)));
+        given(mapper.canUseApprovedRetentionVersion(reviewerId, POLICY_VERSION_ID)).willReturn(false);
+
+        assertThatThrownBy(() -> service.approve(activityId, versionId, reviewerId))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode().value())
+                        .isEqualTo(409));
+
+        verify(mapper, never()).updateVersionTransition(any(), any(), any());
     }
 
     private static ProcessingActivityCreateCommand command(List<ProcessingDataItem> items) {

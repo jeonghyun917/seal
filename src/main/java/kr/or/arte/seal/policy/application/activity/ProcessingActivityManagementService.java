@@ -72,7 +72,11 @@ public class ProcessingActivityManagementService {
 
     @Transactional
     public void approve(UUID activityId, UUID versionId, UUID actorId) {
-        ProcessingActivityVersion approved = find(actorId, activityId, versionId).approve(actorId);
+        ProcessingActivityVersion current = find(actorId, activityId, versionId);
+        if (!mapper.canUseApprovedRetentionVersion(actorId, current.retentionPolicyVersionId())) {
+            throw conflict();
+        }
+        ProcessingActivityVersion approved = current.approve(actorId);
         updateTransition(approved, actorId);
         mapper.supersedePreviousApprovedVersions(activityId, versionId, actorId);
         requireOne(mapper.updateCurrentApprovedVersion(activityId, versionId, actorId));

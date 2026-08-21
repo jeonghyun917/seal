@@ -4,13 +4,17 @@ import kr.or.arte.seal.admin.application.AdminPasswordChangeService;
 import kr.or.arte.seal.admin.application.PasswordChangeResult;
 import kr.or.arte.seal.admin.application.PasswordChangeStatus;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
+import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.common.web.HomeController;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +25,10 @@ import java.util.UUID;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -43,6 +50,17 @@ class AdminSecurityMvcTest {
     @MockitoBean
     private AdminPasswordChangeService passwordChangeService;
 
+    @MockitoBean
+    private DatabaseAuthenticationProvider databaseAuthenticationProvider;
+
+    @BeforeEach
+    void configureDatabaseAuthenticationProvider() {
+        given(databaseAuthenticationProvider.supports(UsernamePasswordAuthenticationToken.class))
+                .willReturn(true);
+        given(databaseAuthenticationProvider.authenticate(any(Authentication.class)))
+                .willThrow(new BadCredentialsException("test authentication failure"));
+    }
+
     @Test
     void anonymousAdministratorRequestRedirectsToCustomLogin() throws Exception {
         mockMvc.perform(get("/admin"))
@@ -55,6 +73,19 @@ class AdminSecurityMvcTest {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/login"));
+    }
+
+    @Test
+    void failedLoginInvokesDatabaseAuthenticationProviderOnlyOnce() throws Exception {
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", "seal-admin")
+                        .param("password", "wrong-password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+
+        verify(databaseAuthenticationProvider, times(1))
+                .authenticate(any(Authentication.class));
     }
 
     @Test

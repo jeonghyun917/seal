@@ -234,7 +234,7 @@
 
 ## 13. DB 변경 기준
 
-DB가 아직 생성되지 않았으므로 기존 초기 SQL을 적용 전 기준으로 교체한다.
+초기 SQL은 로컬 `seal_dev` DB에 적용되었다. 적용된 초기 SQL을 수정하지 않고 이후 변경은 `database/03_patch` 순번 파일로 누적한다.
 
 - DB 생성 스크립트는 `seal_owner` NOLOGIN 역할과 `seal_app` LOGIN 역할을 생성한다.
 - 스키마와 테이블은 `seal_owner`가 소유한다.

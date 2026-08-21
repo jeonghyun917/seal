@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.admin.persistence.role.RoleManagementMapper">
+    <select id="findRole" resultType="kr.or.arte.seal.admin.application.role.RoleDetail">
+        SELECT role_id, role_code, role_name, system_role, active, version_no
+          FROM seal.admin_role
+         WHERE role_id = #{roleId}
+    </select>
+
+    <select id="findPermissions" resultType="kr.or.arte.seal.admin.application.role.PermissionSummary">
+        SELECT permission_id, permission_code, permission_name, description
+          FROM seal.permission
+         ORDER BY permission_code
+    </select>
+
+    <select id="findAssignedPermissionIds" resultType="java.util.UUID">
+        SELECT permission_id
+          FROM seal.role_permission
+         WHERE role_id = #{roleId}
+           AND active = TRUE
+         ORDER BY permission_id
+    </select>
+
+    <select id="findRequiredSystemAdminPermissionIds" resultType="java.util.UUID">
+        SELECT permission_id
+          FROM seal.permission
+         WHERE permission_code IN ('USER_MANAGE', 'ROLE_MANAGE', 'AUDIT_VIEW')
+    </select>
+
+    <select id="countActiveAssignedUsers" resultType="int">
+        SELECT count(*)
+          FROM seal.user_role assignment
+          JOIN seal.admin_user administrator
+            ON administrator.admin_user_id = assignment.admin_user_id
+         WHERE assignment.role_id = #{roleId}
+           AND assignment.active = TRUE
+           AND administrator.account_status != 'INACTIVE'
+    </select>
+
+    <select id="countPermissions" resultType="int">
+        SELECT count(*)
+          FROM seal.permission
+         WHERE permission_id IN
+        <foreach collection="permissionIds" item="permissionId" open="(" separator="," close=")">
+            #{permissionId, jdbcType=OTHER}
+        </foreach>
+    </select>
+
+    <insert id="insert">
+        INSERT INTO seal.admin_role (
+            role_id, role_code, role_name, system_role, active
+        ) VALUES (
+            #{roleId}, #{roleCode}, #{roleName}, FALSE, TRUE
+        )
+    </insert>
+
+    <update id="update">
+        UPDATE seal.admin_role
+           SET role_name = #{roleName},
+               active = #{active},
+               updated_at = CURRENT_TIMESTAMP,
+               version_no = version_no + 1
+         WHERE role_id = #{roleId}
+           AND version_no = #{versionNo}
+    </update>
+
+    <update id="deactivatePermissionsNotIn">
+        UPDATE seal.role_permission
+           SET active = FALSE,
+               revoked_at = CURRENT_TIMESTAMP,
+               revoked_by = #{actorId}
+         WHERE role_id = #{roleId}
+           AND active = TRUE
+           AND permission_id NOT IN
+        <foreach collection="permissionIds" item="permissionId" open="(" separator="," close=")">
+            #{permissionId, jdbcType=OTHER}
+        </foreach>
+    </update>
+
+    <insert id="upsertPermissions">
+        INSERT INTO seal.role_permission (role_id, permission_id, active, revoked_at, revoked_by)
+        VALUES
+        <foreach collection="permissionIds" item="permissionId" separator=",">
+            (#{roleId}, #{permissionId, jdbcType=OTHER}, TRUE, NULL, NULL)
+        </foreach>
+        ON CONFLICT (role_id, permission_id) DO UPDATE
+           SET active = TRUE,
+               revoked_at = NULL,
+               revoked_by = NULL,
+               granted_at = CURRENT_TIMESTAMP
+    </insert>
+</mapper>

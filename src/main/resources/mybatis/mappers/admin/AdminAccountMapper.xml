@@ -27,6 +27,7 @@
            AND r.active = TRUE
           LEFT JOIN seal.role_permission rp
             ON rp.role_id = r.role_id
+           AND rp.active = TRUE
           LEFT JOIN seal.permission p
             ON p.permission_id = rp.permission_id
          WHERE u.login_id = #{loginId}
@@ -56,6 +57,7 @@
            AND r.active = TRUE
           LEFT JOIN seal.role_permission rp
             ON rp.role_id = r.role_id
+           AND rp.active = TRUE
           LEFT JOIN seal.permission p
             ON p.permission_id = rp.permission_id
          WHERE u.admin_user_id = #{adminUserId}

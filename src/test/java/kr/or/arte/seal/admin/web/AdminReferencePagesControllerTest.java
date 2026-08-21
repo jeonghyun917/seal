@@ -1,6 +1,7 @@
 package kr.or.arte.seal.admin.web;
 
 import kr.or.arte.seal.admin.application.role.RoleQuery;
+import kr.or.arte.seal.admin.application.role.RoleManagement;
 import kr.or.arte.seal.admin.application.user.AdminUserManagement;
 import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
@@ -45,6 +46,9 @@ class AdminReferencePagesControllerTest {
 
     @MockitoBean
     private RoleQuery roleQuery;
+
+    @MockitoBean
+    private RoleManagement roleManagement;
 
     @MockitoBean
     private AuditEventQuery auditEventQuery;
@@ -101,6 +105,32 @@ class AdminReferencePagesControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/roles/list"))
                 .andExpect(model().attributeExists("roles"));
+    }
+
+    @Test
+    void permittedUserCanOpenRoleCreationForm() throws Exception {
+        mockMvc.perform(get("/admin/roles/new").with(authentication(admin("ROLE_MANAGE"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/roles/form"))
+                .andExpect(model().attributeExists("roleForm", "permissions"));
+    }
+
+    @Test
+    void roleCreationRequiresCsrf() throws Exception {
+        mockMvc.perform(post("/admin/roles").with(authentication(admin("ROLE_MANAGE"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void validRoleFormCreatesAndRedirects() throws Exception {
+        UUID roleId = UUID.fromString("40000000-0000-0000-0000-000000000010");
+        given(roleManagement.create(any())).willReturn(roleId);
+        mockMvc.perform(post("/admin/roles").with(authentication(admin("ROLE_MANAGE"))).with(csrf())
+                        .param("roleCode", "REQUEST_OPERATOR")
+                        .param("roleName", "요청 담당자")
+                        .param("permissionIds", "50000000-0000-0000-0000-000000000001"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/roles/" + roleId + "?created"));
     }
 
     @Test

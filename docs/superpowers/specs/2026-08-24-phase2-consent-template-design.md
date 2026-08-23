@@ -1,6 +1,7 @@
 # 2단계 동의서 템플릿 설계 기준서
 
-**문서 버전:** v1.0  
+**문서 버전:** v1.1  
+**상태:** 설계 검수 승인  
 **확정 기준:** `docs/superpowers/specs/2026-08-21-consent-system-full-build-design.md`  
 **범위:** 구조화된 동의서 템플릿 작성, 검토, 승인, 발행, 폐기와 관리자 미리보기
 
@@ -52,6 +53,7 @@ JSP 폼과 서버 측 HTML 미리보기를 사용한다. 별도 SPA, jQuery와 �
 - `consent_template_version_id`: UUID 기본키
 - `consent_template_id`: 논리 템플릿
 - `version_number`: 템플릿 내 1부터 증가
+- `processing_activity_id`: 논리 템플릿과 처리업무 버전의 일치를 보장하는 FK 구성 컬럼
 - `processing_activity_version_id`: 승인된 처리업무 버전
 - `workflow_status`: `DRAFT`, `REVIEW_REQUESTED`, `APPROVED`, `PUBLISHED`, `RETIRED`
 - `title`: 정보주체에게 표시할 제목 5~200자
@@ -68,6 +70,7 @@ JSP 폼과 서버 측 HTML 미리보기를 사용한다. 별도 SPA, jQuery와 �
 
 - `consent_item_definition_id`: UUID 기본키
 - `consent_template_version_id`: 소속 템플릿 버전
+- `processing_activity_version_id`: 템플릿 버전과 개인정보 항목의 동일 처리업무 버전을 보장하는 FK 구성 컬럼
 - `item_order`: 버전 안에서 1부터 연속된 표시 순서
 - `item_code`: 버전 안에서 유일한 영문 대문자·숫자·하이픈 2~30자
 - `item_type`: `COLLECTION_USE`, `THIRD_PARTY_PROVISION`, `OPTIONAL`
@@ -80,15 +83,20 @@ JSP 폼과 서버 측 HTML 미리보기를 사용한다. 별도 SPA, jQuery와 �
 
 `OPTIONAL` 항목은 `required = false`여야 한다. `THIRD_PARTY_PROVISION`은 제공받는 자가 필수이며 다른 유형에는 제공받는 자를 저장하지 않는다.
 
+`COLLECTION_USE`와 `OPTIONAL`의 `retention_text`는 관리자가 임의 입력하지 않고 연결된 승인 보유정책 버전에서 서버가 생성해 저장한다. `THIRD_PARTY_PROVISION`은 제공받는 자의 보유·이용기간이 기관 보유정책과 다를 수 있으므로 관리자가 구조화 입력한다. 검토 요청과 발행 때 전자의 문구를 승인 보유정책에서 다시 생성해 불일치를 차단한다.
+
 ### 3.4 `consent_item_data_selection`
 
 동의 결정 단위와 처리업무의 일반 개인정보 항목을 연결한다.
 
 - `consent_item_definition_id`
+- `processing_activity_version_id`
 - `processing_data_item_id`
 - 복합 기본키
 
 각 동의 항목은 개인정보 항목을 하나 이상 선택해야 한다. 선택 항목은 템플릿 버전이 참조하는 동일한 처리업무 버전에 속해야 한다. 민감정보와 고유식별정보는 처리업무 단계에서 허용되지 않으므로 여기에서도 선택할 수 없다.
+
+DB에서도 교차 업무 연결을 막는다. `consent_template_version`은 `(consent_template_id, processing_activity_id)`와 `(processing_activity_version_id, processing_activity_id)` 복합 FK를 사용한다. `consent_item_definition`과 `consent_item_data_selection`은 `processing_activity_version_id`를 함께 저장하고 각각 템플릿 버전 및 `processing_data_item`과의 복합 FK를 사용한다. 이를 위해 참조 대상에는 대응 UNIQUE 제약을 추가한다.
 
 ### 3.5 `template_review`
 
@@ -136,12 +144,13 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 10. 선택한 개인정보 항목이 참조 처리업무 버전에 속한다.
 11. 항목 코드가 버전 안에서 중복되지 않는다.
 12. 승인 또는 발행 시 DB에서 처리업무·보유정책 상태를 다시 조회해 오래된 화면의 제출을 차단한다.
+13. 논리 템플릿이 `ACTIVE` 상태다.
 
 ## 6. HTML 정제와 콘텐츠 해시
 
 `introduction_html`은 OWASP Java HTML Sanitizer로 저장 전에 정제한다. 허용 태그는 `p`, `br`, `ul`, `ol`, `li`, `strong`, `em`, `h3`, `h4`이고 속성, 외부 이미지, 스크립트, 스타일, iframe과 링크는 허용하지 않는다. 정제 결과의 텍스트가 비어 있거나 10자를 충족하지 않으면 거부한다.
 
-발행할 때 다음 값을 명시된 순서와 UTF-8로 정규화한 canonical JSON을 만들고 SHA-256을 계산한다.
+발행할 때 다음 값을 명시된 순서와 UTF-8로 정규화한 canonical JSON을 만들고 SHA-256을 계산한다. 문자열의 줄바꿈은 LF로 통일하고 입력 검증에서 정의한 앞뒤 공백 제거 결과를 사용한다. Jackson은 객체 속성과 Map 키 정렬을 활성화하며 목록은 아래 업무 순서를 그대로 유지한다.
 
 - 템플릿 코드와 버전 번호
 - 처리업무 승인 버전 ID
@@ -155,11 +164,11 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 
 다음 작업 권한을 추가한다.
 
-- `TEMPLATE_VIEW`: 목록, 상세, 버전, 미리보기 조회
-- `TEMPLATE_EDIT`: 템플릿과 초안 버전 생성·수정
-- `TEMPLATE_REVIEW`: 검토 요청
-- `TEMPLATE_APPROVE`: 승인·반려
-- `TEMPLATE_PUBLISH`: 발행·새 버전 생성·논리 템플릿 비활성화
+- `CONSENT_TEMPLATE_VIEW`: 목록, 상세, 버전, 미리보기 조회
+- `CONSENT_TEMPLATE_EDIT`: 템플릿과 초안 버전 생성·수정, 발행 버전에서 새 초안 복제
+- `CONSENT_TEMPLATE_REVIEW`: 검토 요청
+- `CONSENT_TEMPLATE_APPROVE`: 승인·반려
+- `CONSENT_TEMPLATE_PUBLISH`: 발행과 논리 템플릿 활성·비활성화
 
 모든 접근은 권한 외에 연결된 처리업무의 조직·처리업무 범위를 검사한다. 권한이 없으면 403, 권한은 있지만 객체 범위 밖이면 404로 응답한다. 시스템 관리자 역할에는 새 권한을 추가하되 역할 관리 화면을 통해 개인정보 보호책임 업무담당자와 부서 관리자에게 필요한 조합을 배정할 수 있다.
 
@@ -170,6 +179,7 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 - 템플릿 목록: 코드, 명칭, 처리업무, 현재 발행 버전, 상태와 검색 조건
 - 템플릿 생성: 승인 처리업무 선택, 코드, 명칭, 첫 버전 제목·안내문·동의 항목
 - 템플릿 상세: 논리 템플릿 정보와 전체 버전 이력
+- 템플릿 기본정보 수정: 관리자 식별용 명칭과 활성 상태 변경. 템플릿 코드와 연결 처리업무는 생성 후 변경 금지
 - 초안 편집: 안내문과 구조화 동의 항목 편집
 - 미리보기: 이메일/모바일이 공유할 읽기 전용 서버 렌더링 조각
 - 검토 화면: 검증 결과와 승인·반려 작업
@@ -180,6 +190,9 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 - `GET /admin/templates/new`
 - `POST /admin/templates`
 - `GET /admin/templates/{templateId}`
+- `GET /admin/templates/{templateId}/edit`
+- `POST /admin/templates/{templateId}`
+- `POST /admin/templates/{templateId}/status`
 - `GET /admin/templates/{templateId}/versions/{versionId}/edit`
 - `POST /admin/templates/{templateId}/versions/{versionId}`
 - `GET /admin/templates/{templateId}/versions/{versionId}/preview`
@@ -190,6 +203,8 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 - `POST /admin/templates/{templateId}/versions`
 
 모든 변경 요청은 Spring Security CSRF 보호와 POST-Redirect-GET을 사용한다.
+
+새 버전 생성 요청은 `sourceVersionId`를 필수로 받고 해당 템플릿의 가장 최근 `PUBLISHED` 또는 `RETIRED` 버전을 복제한다. 서버가 다음 버전 번호를 계산하며 동시에 두 요청이 들어오면 유일 제약과 행 잠금으로 하나만 성공시킨다.
 
 ## 9. 오류와 동시성
 
@@ -211,9 +226,10 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 - `CONSENT_TEMPLATE_APPROVE`
 - `CONSENT_TEMPLATE_REJECT`
 - `CONSENT_TEMPLATE_PUBLISH`
-- `CONSENT_TEMPLATE_PREVIEW`
 
 감사 메타데이터에는 템플릿·버전 ID, 상태와 변경 전후 해시만 포함한다. 제목, 안내문, 개인정보 항목 원문과 반려 의견은 감사 메타데이터에 복제하지 않는다.
+
+미리보기는 개인정보를 포함하지 않는 일반 읽기 작업이므로 별도 감사 이벤트를 만들지 않는다. 권한 거부와 범위 거부는 공통 보안 감사 정책에 따라 기록한다.
 
 ## 11. DB 변경과 라이브러리
 

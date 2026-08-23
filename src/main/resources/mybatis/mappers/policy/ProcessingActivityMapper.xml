@@ -120,4 +120,56 @@
                updated_at = CURRENT_TIMESTAMP, version_no = version_no + 1
          WHERE processing_activity_id = #{processingActivityId}
     </update>
+
+    <sql id="approvedTemplateActivitySelect">
+        SELECT activity.processing_activity_id AS activity_id,
+               version.processing_activity_version_id AS version_id,
+               activity.owner_organization_unit_id AS owner_organization_id,
+               activity.activity_name, version.processing_purpose,
+               version.legal_basis_type, version.retention_policy_version_id,
+               (CASE retention_version.start_event
+                    WHEN 'CONSENT_SUBMITTED_AT' THEN '동의 제출 후 '
+                    WHEN 'REQUEST_COMPLETED_AT' THEN '업무 요청 완료 후 '
+                    WHEN 'PROGRAM_END_AT' THEN '프로그램 종료 후 '
+                    ELSE '처리 목적 달성 후 '
+                END || retention_version.period_value ||
+                CASE retention_version.period_unit
+                    WHEN 'DAY' THEN '일' WHEN 'MONTH' THEN '개월' ELSE '년' END)
+                    AS retention_display_text
+          FROM seal.processing_activity activity
+          JOIN seal.processing_activity_version version
+            ON version.processing_activity_version_id = activity.current_approved_version_id
+          JOIN seal.retention_policy_version retention_version
+            ON retention_version.retention_policy_version_id = version.retention_policy_version_id
+          JOIN seal.retention_policy retention_policy
+            ON retention_policy.retention_policy_id = retention_version.retention_policy_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE activity.activity_status = 'ACTIVE'
+           AND version.workflow_status = 'APPROVED'
+           AND version.legal_basis_type = 'CONSENT'
+           AND retention_policy.policy_status = 'ACTIVE'
+           AND retention_policy.current_approved_version_id = retention_version.retention_policy_version_id
+           AND retention_version.workflow_status = 'APPROVED'
+    </sql>
+
+    <select id="findApprovedForTemplate" resultType="kr.or.arte.seal.policy.persistence.activity.ApprovedProcessingActivityRow">
+        <include refid="visibleScope"/>
+        <include refid="approvedTemplateActivitySelect"/>
+           AND version.processing_activity_version_id = #{processingActivityVersionId}
+    </select>
+
+    <select id="findAllApprovedForTemplate" resultType="kr.or.arte.seal.policy.persistence.activity.ApprovedProcessingActivityRow">
+        <include refid="visibleScope"/>
+        <include refid="approvedTemplateActivitySelect"/>
+         ORDER BY activity.activity_code
+    </select>
+
+    <select id="findApprovedDataItems" resultType="kr.or.arte.seal.policy.application.activity.ApprovedDataItemReference">
+        SELECT processing_data_item_id, item_order, item_name, required
+          FROM seal.processing_data_item
+         WHERE processing_activity_version_id = #{processingActivityVersionId}
+           AND data_category = 'GENERAL'
+         ORDER BY item_order
+    </select>
 </mapper>

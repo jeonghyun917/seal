@@ -366,7 +366,7 @@ git commit -m "feat: 동의서 템플릿 도메인 규칙 구현"
 - Test: `src/test/java/kr/or/arte/seal/template/persistence/ConsentTemplatePostgresIntegrationTest.java`
 
 **Interfaces:**
-- Produces: `ApprovedProcessingActivityQuery.findApprovedForTemplate(UUID versionId)` and `ConsentTemplateRepository` lifecycle persistence methods
+- Produces: `ApprovedProcessingActivityQuery.findApprovedForTemplate(UUID actorId, UUID versionId)` and `ConsentTemplateRepository` lifecycle persistence methods
 - Consumes: Task 1 tables and Task 2 domain records
 
 - [ ] **Step 1: 저장소 실패 통합 테스트 작성**
@@ -392,7 +392,7 @@ Expected: compilation FAIL because repository types do not exist.
 
 ```java
 public interface ApprovedProcessingActivityQuery {
-    ApprovedProcessingActivityReference findApprovedForTemplate(UUID versionId);
+    ApprovedProcessingActivityReference findApprovedForTemplate(UUID actorId, UUID versionId);
 }
 
 public record ApprovedProcessingActivityReference(
@@ -485,7 +485,7 @@ public interface ConsentTemplateManagement {
 void publishRevalidatesActivityAndRetiresPreviousPublishedVersion() {
     given(repository.requireVersionForUpdate(PUBLISHER, TEMPLATE_ID, NEW_VERSION))
         .willReturn(approvedDetail());
-    given(policyQuery.findApprovedForTemplate(ACTIVITY_VERSION)).willReturn(reference());
+    given(policyQuery.findApprovedForTemplate(AUTHOR, ACTIVITY_VERSION)).willReturn(reference());
 
     service.publish(TEMPLATE_ID, NEW_VERSION, PUBLISHER);
 
@@ -513,7 +513,7 @@ Expected: compilation FAIL because service and commands do not exist.
 public void publish(UUID templateId, UUID versionId, UUID actorId) {
     ConsentTemplateDetail detail = repository.requireDetailForUpdate(templateId, versionId);
     ApprovedProcessingActivityReference policy =
-        policyQuery.findApprovedForTemplate(detail.version().processingActivityVersionId());
+        policyQuery.findApprovedForTemplate(actorId, detail.version().processingActivityVersionId());
     validator.validateAgainst(detail.version(), policy);
     String hash = hasher.sha256(detail, policy);
     repository.publish(templateId, versionId, actorId, hash, clock.instant());

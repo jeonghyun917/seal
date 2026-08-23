@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.template.persistence.ConsentTemplateMapper">
+    <sql id="visibleScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{actorId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+
+    <insert id="insertTemplate">
+        INSERT INTO seal.consent_template (consent_template_id, template_code, template_name,
+            processing_activity_id, template_status, created_by, created_at, updated_by, updated_at)
+        VALUES (#{detail.consentTemplateId}, #{detail.templateCode}, #{detail.templateName},
+            #{detail.processingActivityId}, #{detail.templateStatus}, #{actorId}, #{now}, #{actorId}, #{now})
+    </insert>
+
+    <insert id="insertVersion">
+        INSERT INTO seal.consent_template_version (consent_template_version_id,
+            consent_template_id, processing_activity_id, processing_activity_version_id,
+            version_number, workflow_status, title, introduction_html, created_by,
+            created_at, updated_by, updated_at)
+        VALUES (#{version.consentTemplateVersionId}, #{version.consentTemplateId},
+            #{version.processingActivityId}, #{version.processingActivityVersionId},
+            #{version.versionNumber}, #{version.workflowStatus}, #{version.title},
+            #{version.introductionHtml}, #{actorId}, #{now}, #{actorId}, #{now})
+    </insert>
+
+    <insert id="insertItems">
+        INSERT INTO seal.consent_item_definition (consent_item_definition_id,
+            consent_template_version_id, processing_activity_version_id, item_order,
+            item_code, item_type, item_title, required, purpose_text, retention_text,
+            refusal_notice, third_party_recipient)
+        VALUES
+        <foreach collection="items" item="item" separator=",">
+            (#{item.itemId}, #{versionId}, #{processingActivityVersionId}, #{item.order},
+             #{item.code}, #{item.type}, #{item.title}, #{item.required}, #{item.purpose},
+             #{item.retentionText}, #{item.refusalNotice},
+             #{item.thirdPartyRecipient, jdbcType=VARCHAR})
+        </foreach>
+    </insert>
+
+    <insert id="insertSelections">
+        INSERT INTO seal.consent_item_data_selection (consent_item_definition_id,
+            processing_activity_version_id, processing_data_item_id)
+        VALUES
+        <foreach collection="selections" item="selection" separator=",">
+            (#{selection.itemId}, #{selection.processingActivityVersionId},
+             #{selection.processingDataItemId})
+        </foreach>
+    </insert>
+
+    <select id="findVisibleVersionForUpdate" resultType="kr.or.arte.seal.template.persistence.ConsentTemplateHeaderRow">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id, template.template_code, template.template_name,
+               template.processing_activity_id, activity.activity_name AS processing_activity_name,
+               template.template_status, template.current_published_version_id,
+               template.version_no AS template_version_no,
+               version.consent_template_version_id, version.processing_activity_version_id,
+               version.version_number, version.workflow_status, version.title,
+               version.introduction_html, version.created_by, version.review_requested_by,
+               version.approved_by, version.published_by, version.rejection_comment,
+               version.content_hash, version.version_no
+          FROM seal.consent_template template
+          JOIN seal.consent_template_version version
+            ON version.consent_template_id = template.consent_template_id
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE template.consent_template_id = #{templateId}
+           AND version.consent_template_version_id = #{versionId}
+         FOR UPDATE OF template, version
+    </select>
+
+    <select id="findItems" resultType="kr.or.arte.seal.template.persistence.ConsentItemRow">
+        SELECT consent_item_definition_id AS item_id, item_order, item_code, item_type,
+               item_title, required, purpose_text, retention_text, refusal_notice,
+               third_party_recipient
+          FROM seal.consent_item_definition
+         WHERE consent_template_version_id = #{versionId}
+         ORDER BY item_order
+    </select>
+
+    <select id="findSelections" resultType="kr.or.arte.seal.template.persistence.ConsentDataSelectionRow">
+        SELECT selection.consent_item_definition_id AS item_id,
+               selection.processing_data_item_id
+          FROM seal.consent_item_data_selection selection
+          JOIN seal.consent_item_definition item
+            ON item.consent_item_definition_id = selection.consent_item_definition_id
+         WHERE item.consent_template_version_id = #{versionId}
+         ORDER BY item.item_order, selection.processing_data_item_id
+    </select>
+
+    <select id="clearDraftItems" resultType="int">
+        SELECT seal.clear_draft_consent_items(#{versionId}, #{actorId})
+    </select>
+
+    <update id="updateDraft">
+        UPDATE seal.consent_template_version
+           SET title = #{version.title}, introduction_html = #{version.introductionHtml},
+               rejection_comment = #{version.rejectionComment, jdbcType=VARCHAR},
+               updated_by = #{actorId}, updated_at = #{now}, version_no = version_no + 1
+         WHERE consent_template_version_id = #{version.consentTemplateVersionId}
+           AND workflow_status = 'DRAFT'
+           AND version_no = #{version.versionNo}
+    </update>
+</mapper>

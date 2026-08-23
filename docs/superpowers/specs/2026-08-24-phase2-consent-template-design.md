@@ -118,6 +118,7 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 ```
 
 - 초안만 내용과 항목을 수정할 수 있다.
+- 초안 항목 교체는 애플리케이션의 직접 DELETE가 아니라 대상 버전의 `DRAFT` 상태와 작업자 조직 범위를 다시 확인하는 DB 함수로만 수행한다.
 - 초안은 동의 항목이 하나 이상이고 모든 서버 검증을 통과해야 검토 요청할 수 있다.
 - 검토 요청된 버전만 승인 또는 반려할 수 있다.
 - 작성자와 승인자는 달라야 한다.
@@ -234,9 +235,12 @@ DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED
 ## 11. DB 변경과 라이브러리
 
 - DB 패치: `database/03_patch/20260824_001_create_consent_template_tables.sql`
+- DB 보완 패치: `database/03_patch/20260824_002_add_template_draft_replace_function.sql`
 - 검증 SQL: `database/04_verify/005_consent_template_verify.sql`
+- 보완 검증 SQL: `database/04_verify/006_template_draft_replace_verify.sql`
 - 적용 SQL은 수정하지 않고 SHA-256과 애플리케이션 버전을 `db_change_history`에 기록한다.
 - `seal_app`에는 템플릿 본문 테이블 SELECT·INSERT·UPDATE만 허용하고 DELETE·TRUNCATE·DDL은 허용하지 않는다.
+- `seal_app`은 `clear_draft_consent_items(version_id, actor_id)` 실행만 허용받으며 함수가 초안 상태와 작업자 조직 범위를 확인한 경우에만 자식 항목을 교체한다.
 - `template_review`는 SELECT·INSERT만 허용한다.
 - HTML 정제는 `org.owasp.html:owasp-java-html-sanitizer`를 사용한다.
 - SHA-256과 canonical JSON 직렬화는 JDK `MessageDigest`와 현재 Spring Boot Jackson을 사용한다.

@@ -16,5 +16,6 @@ Flyway나 Liquibase를 사용하지 않으므로 운영 반영 SQL은 이 폴더
 2. `20260821_002_add_assignment_lifecycle.sql`
 3. `20260821_003_add_role_permission_lifecycle.sql`
 4. `20260824_001_create_consent_template_tables.sql`
+5. `20260824_002_add_template_draft_replace_function.sql`
 
-각 패치는 동일 번호의 `database/04_verify` 검증 SQL과 함께 적용한다. 템플릿 패치는 처리업무 승인 버전과 개인정보 항목을 복합 외래키로 고정하므로 반드시 기존 1~3번 패치 다음에 실행한다.
+각 패치는 대응하는 `database/04_verify` 검증 SQL과 함께 적용한다. 템플릿 테이블 패치는 처리업무 승인 버전과 개인정보 항목을 복합 외래키로 고정하므로 반드시 기존 1~3번 패치 다음에 실행한다. 5번 패치는 4번 테이블을 전제로 하며 애플리케이션에 직접 DELETE 권한을 주지 않고 범위 안의 초안 항목만 교체하게 한다.

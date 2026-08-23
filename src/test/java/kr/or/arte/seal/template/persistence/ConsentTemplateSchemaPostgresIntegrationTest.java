@@ -56,8 +56,22 @@ class ConsentTemplateSchemaPostgresIntegrationTest {
     void appliesLeastPrivilegeForTemplateTables() {
         assertThat(hasTablePrivilege("consent_template", "SELECT,INSERT,UPDATE")).isTrue();
         assertThat(hasTablePrivilege("consent_template", "DELETE")).isFalse();
+        assertThat(hasTablePrivilege("consent_item_definition", "DELETE")).isFalse();
+        assertThat(hasTablePrivilege("consent_item_data_selection", "DELETE")).isFalse();
         assertThat(hasTablePrivilege("template_review", "SELECT,INSERT")).isTrue();
         assertThat(hasTablePrivilege("template_review", "UPDATE,DELETE")).isFalse();
+    }
+
+    @Test
+    void exposesOnlyScopedDraftItemReplacementFunction() {
+        Boolean canExecute = jdbcTemplate.queryForObject("""
+                SELECT has_function_privilege(
+                    'seal_app',
+                    'seal.clear_draft_consent_items(uuid,uuid)',
+                    'EXECUTE')
+                """, Boolean.class);
+
+        assertThat(canExecute).isTrue();
     }
 
     @Test

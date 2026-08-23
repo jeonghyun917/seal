@@ -28,6 +28,8 @@
 **Files:**
 - Create: `database/03_patch/20260824_001_create_consent_template_tables.sql`
 - Create: `database/04_verify/005_consent_template_verify.sql`
+- Create: `database/03_patch/20260824_002_add_template_draft_replace_function.sql`
+- Create: `database/04_verify/006_template_draft_replace_verify.sql`
 - Modify: `database/03_patch/README.md`
 - Test: `src/test/java/kr/or/arte/seal/template/persistence/ConsentTemplateSchemaPostgresIntegrationTest.java`
 
@@ -66,6 +68,8 @@ Expected: FAIL because the five template tables do not exist.
 - [ ] **Step 3: 수동 DB 패치 작성**
 
 패치에는 다음 제약을 정확히 포함한다.
+
+초안 항목 교체는 `seal_app`에 DELETE 권한을 부여하지 않고 별도 보완 패치의 `clear_draft_consent_items(version_id, actor_id)` 함수로 수행한다. 함수는 `SECURITY DEFINER`와 고정 `search_path`를 사용하고 대상 버전의 `DRAFT` 상태 및 작업자의 활성 조직 범위를 검사한다.
 
 ```sql
 CREATE TABLE consent_template (

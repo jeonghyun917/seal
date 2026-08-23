@@ -28,3 +28,6 @@ Thumbs.db
 docs/*.tmp
 docs/*.bin
 docs/.render_*/
+
+# Local isolated feature workspaces
+.worktrees/

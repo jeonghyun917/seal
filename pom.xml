@@ -24,6 +24,7 @@
         <!-- 5.0.1 is a source/security patch release; runtime artifacts are published as 5.0.0. -->
         <egovframe.version>5.0.0</egovframe.version>
         <mybatis-spring-boot.version>3.0.5</mybatis-spring-boot.version>
+        <owasp-java-html-sanitizer.version>20260313.1</owasp-java-html-sanitizer.version>
     </properties>
 
     <repositories>
@@ -86,6 +87,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
+            <artifactId>owasp-java-html-sanitizer</artifactId>
+            <version>${owasp-java-html-sanitizer.version}</version>
         </dependency>
 
         <!-- JSP/JSTL -->

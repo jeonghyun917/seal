@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -119,8 +120,7 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
         ConsentTemplateDetail detail = find(actorId, templateId, versionId);
         ApprovedProcessingActivityReference policy = policy(actorId, detail);
         validator.validateAgainst(detail.version(), policy);
-        String hash = hasher.sha256(Map.of("templateCode", detail.templateCode(),
-                "version", detail.version(), "policy", policy));
+        String hash = hasher.sha256(hashPayload(detail, policy));
         ConsentTemplateVersion published = domain(() -> detail.version().publish(actorId, hash));
         repository.publish(published, actorId, clock.instant());
         audit("CONSENT_TEMPLATE_PUBLISH", templateId, versionId, actorId, hash);
@@ -178,6 +178,29 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
         } catch (IllegalArgumentException exception) {
             throw conflict("승인 처리업무 버전이 더 이상 유효하지 않습니다.", exception);
         }
+    }
+
+    private TemplateContentHashPayload hashPayload(ConsentTemplateDetail detail,
+                                                    ApprovedProcessingActivityReference policy) {
+        Map<UUID, kr.or.arte.seal.policy.application.activity.ApprovedDataItemReference> references =
+                policy.dataItems().stream().collect(java.util.stream.Collectors.toMap(
+                        item -> item.processingDataItemId(), item -> item));
+        List<TemplateContentHashPayload.Item> items = detail.version().items().stream()
+                .sorted(Comparator.comparingInt(item -> item.order()))
+                .map(item -> new TemplateContentHashPayload.Item(item.order(), item.code(),
+                        item.type(), item.title(), item.required(), item.purpose(),
+                        item.retentionText(), item.refusalNotice(), item.thirdPartyRecipient(),
+                        item.processingDataItemIds().stream().map(references::get)
+                                .filter(Objects::nonNull)
+                                .sorted(Comparator.comparingInt(reference -> reference.itemOrder()))
+                                .map(reference -> new TemplateContentHashPayload.DataItem(
+                                        reference.processingDataItemId(), reference.itemOrder(),
+                                        reference.itemName()))
+                                .toList()))
+                .toList();
+        return new TemplateContentHashPayload(detail.templateCode(),
+                detail.version().versionNumber(), detail.version().processingActivityVersionId(),
+                detail.version().title(), detail.version().introductionHtml(), items);
     }
 
     private List<ConsentItemDefinition> toItems(List<ConsentItemDraftCommand> commands,

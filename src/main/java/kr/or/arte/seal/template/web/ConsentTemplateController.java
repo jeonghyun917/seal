@@ -21,6 +21,11 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.HttpStatus;
+import jakarta.servlet.http.HttpServletRequest;
+import kr.or.arte.seal.template.application.TemplateBusinessConflictException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -176,6 +181,21 @@ public class ConsentTemplateController {
         return redirect(templateId, "statusUpdated");
     }
 
+    @ExceptionHandler(TemplateBusinessConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String conflict(TemplateBusinessConflictException exception,
+            HttpServletRequest request, @AuthenticationPrincipal AdminPrincipal principal,
+            Model model) {
+        model.addAttribute("administrator", principal);
+        model.addAttribute("conflictMessage", exception.getMessage());
+        UUID templateId = templateIdFrom(request.getRequestURI());
+        if (templateId != null) {
+            model.addAttribute("template", query.requireScoped(templateId, principal.adminUserId()));
+            return "admin/templates/detail";
+        }
+        return "admin/templates/conflict";
+    }
+
     private void populateForm(AdminPrincipal principal, Model model, boolean editing,
                               UUID templateId, UUID versionId) {
         model.addAttribute("administrator", principal);
@@ -218,5 +238,19 @@ public class ConsentTemplateController {
 
     private static String redirect(UUID templateId, String event) {
         return "redirect:/admin/templates/" + templateId + "?" + event;
+    }
+
+    private static UUID templateIdFrom(String uri) {
+        String marker = "/admin/templates/";
+        int start = uri.indexOf(marker);
+        if (start < 0) return null;
+        String remainder = uri.substring(start + marker.length());
+        String candidate = remainder.contains("/")
+                ? remainder.substring(0, remainder.indexOf('/')) : remainder;
+        try {
+            return UUID.fromString(candidate);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 }

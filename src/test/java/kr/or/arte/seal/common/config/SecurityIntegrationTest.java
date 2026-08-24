@@ -12,7 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
-@SpringBootTest(properties = "spring.datasource.password=test-only")
+@SpringBootTest
 @AutoConfigureMockMvc
 class SecurityIntegrationTest {
 

@@ -8,6 +8,8 @@ import kr.or.arte.seal.template.application.ConsentTemplateManagement;
 import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.TemplateNotFoundException;
 import kr.or.arte.seal.template.application.TemplatePreviewRenderer;
+import kr.or.arte.seal.template.application.TemplateBusinessConflictException;
+import kr.or.arte.seal.template.application.ConsentTemplatePage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -23,6 +25,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -100,6 +103,23 @@ class ConsentTemplateControllerTest {
         mockMvc.perform(get("/admin/templates/{id}", TEMPLATE_ID)
                         .with(authentication(admin("CONSENT_TEMPLATE_VIEW"))))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void workflowConflictReturnsLatestDetailWithConflictStatus() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        willThrow(new TemplateBusinessConflictException("다른 사용자가 상태를 변경했습니다."))
+                .given(management).publish(TEMPLATE_ID, versionId, principal().adminUserId());
+        given(query.requireScoped(TEMPLATE_ID, principal().adminUserId()))
+                .willReturn(new ConsentTemplatePage(TEMPLATE_ID, "TPL-EDU", "교육 동의서",
+                        UUID.randomUUID(), "교육 업무", "ACTIVE", null, 1, List.of()));
+
+        mockMvc.perform(post("/admin/templates/{templateId}/versions/{versionId}/publish",
+                        TEMPLATE_ID, versionId)
+                        .with(authentication(admin("CONSENT_TEMPLATE_PUBLISH"))).with(csrf()))
+                .andExpect(status().isConflict())
+                .andExpect(view().name("admin/templates/detail"))
+                .andExpect(model().attributeExists("template", "conflictMessage"));
     }
 
     private static UsernamePasswordAuthenticationToken admin(String... authorities) {

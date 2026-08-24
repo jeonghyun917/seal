@@ -105,6 +105,14 @@ class ConsentTemplateManagementServiceTest {
 
         service.publish(TEMPLATE_ID, VERSION_ID, PUBLISHER);
 
+        ArgumentCaptor<Object> hashPayloadCaptor = ArgumentCaptor.forClass(Object.class);
+        then(hasher).should().sha256(hashPayloadCaptor.capture());
+        assertThat(hashPayloadCaptor.getValue()).isInstanceOf(TemplateContentHashPayload.class);
+        TemplateContentHashPayload payload = (TemplateContentHashPayload) hashPayloadCaptor.getValue();
+        assertThat(payload.templateCode()).isEqualTo("TPL-EDU");
+        assertThat(payload.items()).singleElement()
+                .satisfies(item -> assertThat(item.dataItems()).singleElement()
+                        .satisfies(data -> assertThat(data.name()).isEqualTo("이메일")));
         ArgumentCaptor<ConsentTemplateVersion> versionCaptor =
                 ArgumentCaptor.forClass(ConsentTemplateVersion.class);
         then(repository).should().publish(versionCaptor.capture(), any(), any());

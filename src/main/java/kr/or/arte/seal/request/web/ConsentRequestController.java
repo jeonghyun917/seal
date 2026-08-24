@@ -2,6 +2,8 @@ package kr.or.arte.seal.request.web;
 
 import jakarta.validation.Valid;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
+import kr.or.arte.seal.delivery.application.ConsentDeliveryService;
+import kr.or.arte.seal.delivery.application.DeliveryIssueResult;
 import kr.or.arte.seal.link.application.IssuedSecureLink;
 import kr.or.arte.seal.link.application.SecureLinkManagementService;
 import kr.or.arte.seal.recipient.application.RecipientQueryService;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -34,13 +37,14 @@ public class ConsentRequestController {
     private final ConsentRequestManagement management;
     private final ConsentRequestQueryService query;
     private final SecureLinkManagementService links;
+    private final ConsentDeliveryService delivery;
     private final RecipientQueryService recipients;
     private final PublishedConsentTemplateQuery templates;
 
     public ConsentRequestController(ConsentRequestManagement management, ConsentRequestQueryService query,
-            SecureLinkManagementService links, RecipientQueryService recipients,
+            SecureLinkManagementService links, ConsentDeliveryService delivery, RecipientQueryService recipients,
             PublishedConsentTemplateQuery templates) {
-        this.management=management; this.query=query; this.links=links;
+        this.management=management; this.query=query; this.links=links; this.delivery=delivery;
         this.recipients=recipients; this.templates=templates;
     }
 
@@ -134,7 +138,29 @@ public class ConsentRequestController {
         flash(redirect, links.reissue(principal.adminUserId(), requestId, versionNo));
         return "redirect:/admin/requests/"+requestId+"/issued-link";
     }
-    @GetMapping("/admin/requests/{requestId}/issued-link") @PreAuthorize("hasAnyAuthority('CONSENT_REQUEST_ACTIVATE','CONSENT_REQUEST_LINK_REISSUE')")
+
+    @PostMapping("/admin/requests/{requestId}/deliver")
+    @PreAuthorize("hasAuthority('MAIL_SEND')")
+    public String deliver(@PathVariable UUID requestId, @RequestParam long versionNo,
+            @RequestParam(required = false) String scheduledAt,
+            @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
+        var result = delivery.activateAndQueue(principal.adminUserId(), requestId, versionNo,
+                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString(), parseSchedule(scheduledAt));
+        flash(redirect, result);
+        return "redirect:/admin/requests/" + requestId + "/issued-link";
+    }
+
+    @PostMapping("/admin/requests/{requestId}/redeliver")
+    @PreAuthorize("hasAuthority('MAIL_SEND')")
+    public String redeliver(@PathVariable UUID requestId, @RequestParam long versionNo,
+            @RequestParam(required = false) String scheduledAt,
+            @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
+        var result = delivery.reissueAndQueue(principal.adminUserId(), requestId, versionNo,
+                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString(), parseSchedule(scheduledAt));
+        flash(redirect, result);
+        return "redirect:/admin/requests/" + requestId + "/issued-link";
+    }
+    @GetMapping("/admin/requests/{requestId}/issued-link") @PreAuthorize("hasAnyAuthority('CONSENT_REQUEST_ACTIVATE','CONSENT_REQUEST_LINK_REISSUE','MAIL_SEND')")
     public String issued(@PathVariable UUID requestId,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         IssuedSecureLink issued = (IssuedSecureLink) model.asMap().get("issuedLink");
@@ -149,4 +175,14 @@ public class ConsentRequestController {
     private static void base(AdminPrincipal p, Model m){m.addAttribute("administrator",p);}
     private static String redirect(UUID id){return "redirect:/admin/requests/"+id;}
     private static void flash(RedirectAttributes r, IssuedSecureLink link){r.addFlashAttribute("issuedLink",link);}
+    private static void flash(RedirectAttributes r, DeliveryIssueResult result){
+        r.addFlashAttribute("issuedLink", result.issuedLink());
+        r.addFlashAttribute("outboxId", result.outboxId());
+        r.addFlashAttribute("mailStatus", result.mailStatus());
+    }
+    private static java.time.Instant parseSchedule(String value){
+        if(value==null||value.isBlank())return null;
+        try{return LocalDateTime.parse(value).atZone(KOREA).toInstant();}
+        catch(RuntimeException exception){throw new IllegalArgumentException("올바른 발송 예약일시를 입력해 주세요.");}
+    }
 }

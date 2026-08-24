@@ -25,7 +25,7 @@ class RecipientPostgresIntegrationTest {
     @Test
     void storesEncryptedRecipientAndReturnsOnlyMaskedQueryValues() {
         UUID actorId = jdbc.queryForObject(
-                "SELECT admin_user_id FROM seal.admin_user WHERE login_id = 'vheraclesv'", UUID.class);
+                "SELECT admin_user_id FROM seal.admin_user WHERE login_id = 'seal-admin'", UUID.class);
         UUID organizationId = jdbc.queryForObject(
                 "SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit = TRUE", UUID.class);
         String email = "recipient-" + UUID.randomUUID() + "@example.com";

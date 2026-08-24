@@ -1,0 +1,2 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>동의 요청 확인 오류</title><link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/public-consent.css"></head><body><main class="consent-shell"><section class="consent-card"><h1>동의 요청을 계속할 수 없습니다</h1><p>세션이 만료되었거나 이미 처리된 요청입니다. 안내 메일의 링크에서 다시 시작해 주세요.</p></section></main></body></html>

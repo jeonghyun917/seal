@@ -2,7 +2,15 @@ package kr.or.arte.seal.request.persistence;
 
 import kr.or.arte.seal.recipient.application.CreateRecipientCommand;
 import kr.or.arte.seal.recipient.application.RecipientManagementService;
-import kr.or.arte.seal.link.application.SecureLinkManagementService;
+import kr.or.arte.seal.delivery.application.ConsentDeliveryService;
+import kr.or.arte.seal.delivery.application.MailOutboxQueryService;
+import kr.or.arte.seal.delivery.application.MailOutboxStatus;
+import kr.or.arte.seal.consent.application.ConsentDecision;
+import kr.or.arte.seal.consent.application.ConsentResponseStatus;
+import kr.or.arte.seal.consent.application.ConsentSubmissionService;
+import kr.or.arte.seal.consent.application.PublicConsentEntryService;
+import kr.or.arte.seal.consent.application.PublicConsentEntryStatus;
+import kr.or.arte.seal.consent.application.PublicConsentQueryService;
 import kr.or.arte.seal.request.application.ConsentRequestManagementService;
 import kr.or.arte.seal.request.application.CreateConsentRequestCommand;
 import org.junit.jupiter.api.Test;
@@ -24,13 +32,17 @@ class ConsentRequestPostgresIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RecipientManagementService recipients;
     @Autowired ConsentRequestManagementService requests;
-    @Autowired SecureLinkManagementService links;
+    @Autowired ConsentDeliveryService delivery;
+    @Autowired MailOutboxQueryService mailOutbox;
+    @Autowired PublicConsentEntryService publicEntry;
+    @Autowired PublicConsentQueryService publicQuery;
+    @Autowired ConsentSubmissionService submissions;
 
     @Test
     void createsAndFinalizesRequestWithImmutableSnapshotRows() {
-        UUID actor = id("SELECT admin_user_id FROM seal.admin_user WHERE login_id='vheraclesv'");
-        UUID creator = id("SELECT admin_user_id FROM seal.admin_user WHERE login_id='seal-admin'");
+        UUID actor = id("SELECT admin_user_id FROM seal.admin_user WHERE login_id='seal-admin'");
         UUID org = id("SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit=TRUE");
+        UUID creator = fixtureCreator();
         Fixture fixture = publishedFixture(org, creator, actor);
         UUID recipient = recipients.create(new CreateRecipientCommand(actor, org, "요청 대상자",
                 "request-" + UUID.randomUUID() + "@example.com", "교육 프로그램 신청서 직접 수집"));
@@ -38,15 +50,15 @@ class ConsentRequestPostgresIntegrationTest {
         var created = requests.create(actor, new CreateConsentRequestCommand(org, recipient,
                 fixture.templateVersionId(), Instant.now().plusSeconds(7200), UUID.randomUUID()));
         requests.finalizeRequest(actor, created.requestId(), 0);
-        var issued = links.activate(actor, created.requestId(), 1);
-        var reissued = links.reissue(actor, created.requestId(), 2);
+        var issued = delivery.activateAndQueue(actor, created.requestId(), 1, "http://localhost:9090", null);
+        var reissued = delivery.reissueAndQueue(actor, created.requestId(), 2, "http://localhost:9090", null);
 
         assertThat(jdbc.queryForObject("SELECT request_status FROM seal.consent_request WHERE consent_request_id=?",
                 String.class, created.requestId())).isEqualTo("ACTIVE");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_request_snapshot WHERE consent_request_id=?",
                 Integer.class, created.requestId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT token_hmac FROM seal.secure_link WHERE consent_request_id=? AND link_status='ISSUED'",
-                String.class, created.requestId())).hasSize(64).isNotEqualTo(reissued.token());
+                String.class, created.requestId())).hasSize(64).isNotEqualTo(reissued.issuedLink().token());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.secure_link WHERE consent_request_id=? AND link_status='REVOKED'",
                 Integer.class, created.requestId())).isEqualTo(1);
         requests.cancel(actor, created.requestId(), 3, "통합테스트 관리자 취소");
@@ -54,6 +66,49 @@ class ConsentRequestPostgresIntegrationTest {
                 Integer.class, created.requestId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_request_item_data data JOIN seal.consent_request_item item ON item.consent_request_item_id=data.consent_request_item_id JOIN seal.consent_request_snapshot snapshot ON snapshot.consent_request_snapshot_id=item.consent_request_snapshot_id WHERE snapshot.consent_request_id=?",
                 Integer.class, created.requestId())).isEqualTo(1);
+        var mailRows = mailOutbox.search(actor, null);
+        assertThat(mailRows).filteredOn(row -> row.requestId().equals(created.requestId()))
+                .extracting(row -> row.status()).containsExactlyInAnyOrder(MailOutboxStatus.CANCELLED, MailOutboxStatus.QUEUED);
+        assertThat(mailOutbox.require(actor, reissued.outboxId()).html())
+                .contains("http://localhost:9090/consent/").doesNotContain("<form").doesNotContain("<script");
+    }
+
+    @Test
+    void publicFlowDoesNotMutateOnGetAndCompletesExactlyOnceOnPost() {
+        UUID actor = id("SELECT admin_user_id FROM seal.admin_user WHERE login_id='seal-admin'");
+        UUID org = id("SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit=TRUE");
+        UUID creator = fixtureCreator();
+        Fixture fixture = publishedFixture(org, creator, actor);
+        UUID recipient = recipients.create(new CreateRecipientCommand(actor, org, "공개동의 대상자",
+                "public-" + UUID.randomUUID() + "@example.com", "교육 프로그램 신청서 직접 수집"));
+        var request = requests.create(actor, new CreateConsentRequestCommand(org, recipient,
+                fixture.templateVersionId(), Instant.now().plusSeconds(7200), UUID.randomUUID()));
+        requests.finalizeRequest(actor, request.requestId(), 0);
+        var deliveryResult = delivery.activateAndQueue(actor, request.requestId(), 1,
+                "http://localhost:9090", null);
+        String token = deliveryResult.issuedLink().token();
+
+        assertThat(publicEntry.inspect(token).status()).isEqualTo(PublicConsentEntryStatus.VALID);
+        assertThat(jdbc.queryForObject("SELECT link_status FROM seal.secure_link WHERE secure_link_id=?",
+                String.class, deliveryResult.issuedLink().linkId())).isEqualTo("ISSUED");
+
+        var flow = publicEntry.start(token);
+        assertThat(jdbc.queryForObject("SELECT link_status FROM seal.secure_link WHERE secure_link_id=?",
+                String.class, deliveryResult.issuedLink().linkId())).isEqualTo("ACCESSED");
+        var page = publicQuery.load(flow.flowId());
+        var decisions = new java.util.LinkedHashMap<UUID, ConsentDecision>();
+        page.items().forEach(item -> decisions.put(item.itemId(), ConsentDecision.AGREE));
+        UUID idempotency = UUID.randomUUID();
+        var submitted = submissions.submit(flow.flowId(), decisions, idempotency);
+        var repeated = submissions.submit(flow.flowId(), decisions, idempotency);
+
+        assertThat(submitted.status()).isEqualTo(ConsentResponseStatus.SUBMITTED);
+        assertThat(repeated.existing()).isTrue();
+        assertThat(repeated.responseId()).isEqualTo(submitted.responseId());
+        assertThat(jdbc.queryForObject("SELECT request_status FROM seal.consent_request WHERE consent_request_id=?",
+                String.class, request.requestId())).isEqualTo("COMPLETED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_response WHERE consent_request_id=?",
+                Integer.class, request.requestId())).isEqualTo(1);
     }
 
     private Fixture publishedFixture(UUID org, UUID creator, UUID approver) {
@@ -83,6 +138,13 @@ class ConsentRequestPostgresIntegrationTest {
         jdbc.update("INSERT INTO seal.consent_item_data_selection(consent_item_definition_id,processing_activity_version_id,processing_data_item_id) VALUES(?,?,?)",
                 consentItem, activityVersion, dataItem);
         return new Fixture(templateVersion);
+    }
+
+    private UUID fixtureCreator() {
+        UUID creator = UUID.randomUUID();
+        jdbc.update("INSERT INTO seal.admin_user(admin_user_id,login_id,display_name,organization_unit_id,password_hash,must_change_password) SELECT ?,?,?,organization_unit_id,password_hash,FALSE FROM seal.admin_user WHERE login_id='seal-admin'",
+                creator, "fixture-" + creator.toString().substring(0, 8), "통합테스트 작성자");
+        return creator;
     }
 
     private UUID id(String sql) { return jdbc.queryForObject(sql, UUID.class); }

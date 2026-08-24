@@ -1,0 +1,2 @@
+package kr.or.arte.seal.delivery.application;
+public class MailTransportException extends RuntimeException{private final boolean temporary;private final String reasonCode;public MailTransportException(boolean temporary,String reasonCode){super("메일 전송에 실패했습니다.");this.temporary=temporary;this.reasonCode=reasonCode;}public boolean temporary(){return temporary;}public String reasonCode(){return reasonCode;}}

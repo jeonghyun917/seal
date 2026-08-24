@@ -84,8 +84,10 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `http://localhost:9090/admin/templates/new`
 - `http://localhost:9090/admin/recipients`
 - `http://localhost:9090/admin/recipients/new`
+- `http://localhost:9090/admin/recipients/import`
 - `http://localhost:9090/admin/requests`
 - `http://localhost:9090/admin/requests/new`
+- `http://localhost:9090/admin/mail-outbox`
 - `http://localhost:9090/actuator/health`
 
 로컬 프로필에서는 실제 메일 발송이 비활성화된다. SMTP 테스트는 Rocky Linux 공인 IP 등록 후 승인된 수신 주소로만 수행한다.
@@ -158,7 +160,7 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 | `CONSENT_REQUEST_CANCEL` | 진행 중 요청 취소 |
 | `CONSENT_REQUEST_LINK_REISSUE` | 활성 요청의 링크 재발급 |
 
-Phase 3A는 개별 대상자 등록까지만 포함한다. Excel 일괄 반입과 ClamAV는 3B, 공개 링크 진입·동의 제출은 4단계, HTML 이메일·Outbox·SMTP 발송은 5단계, 증적·철회·파기는 6단계에서 구현한다.
+Phase 3A는 개별 대상자 등록과 요청·링크 기반을 제공한다. Excel 일괄 반입, 공개 링크 동의 제출, HTML 이메일·Outbox는 아래 Phase 3B~5에서 이어진다. 증적·철회·파기는 6단계에서 구현한다.
 
 ### Phase 3A 검증 결과
 
@@ -166,3 +168,26 @@ Phase 3A는 개별 대상자 등록까지만 포함한다. Excel 일괄 반입�
 - 전체 자동화 테스트: 171건, 실패·오류·건너뜀 0건
 - 실행 산출물: `target/seal.war`
 - 로컬 실행 포트: 9090
+
+## Phase 3B~5 일괄반입·공개 동의·HTML 이메일
+
+Excel 반입은 `.xlsx` 5 MiB·1,000행으로 제한하며 이름·이메일 두 열을 행별 검증한다. 원본 파일은 저장하지 않고 검증 행만 AES-256-GCM으로 최대 24시간 임시 보관한다. 확정 시 정상 행을 `EXCEL` 출처 대상자로 생성하고 정상·중복 행의 임시 암호문을 즉시 파기한다. 로컬 ClamAV는 기본 비활성이고, 운영 활성화 상태에서 검사 서버 연결 또는 판정에 실패하면 반입을 거부한다.
+
+공개 동의는 링크 GET에서 상태를 변경하지 않는다. 사용자가 CSRF 보호 POST로 시작한 뒤 토큰 없는 흐름 URL에서 모든 항목을 각각 동의·미동의로 선택하고 최종 제출한다. 제출은 PostgreSQL 단일 트랜잭션과 멱등키로 요청·링크·세션·응답·감사를 한 번만 완료한다. 이 링크 보유 방식은 실명 본인확인이 아니다.
+
+HTML 이메일은 확정 요청 스냅샷을 웹 화면과 함께 단일 원본으로 사용한다. 이메일 본문에는 입력 폼·스크립트·외부 이미지·추적 픽셀이 없고 기관 웹페이지 버튼만 포함한다. 수신주소와 HTML은 암호화 Outbox에 저장하며 `QUEUED`, `PROCESSING`, `SMTP_ACCEPTED`, `RETRY_SCHEDULED`, `SEND_FAILED`, `CANCELLED` 상태를 분리한다. 일시 오류는 1·5·30분 간격으로 최대 3회 재시도한다.
+
+| 권한 | 허용 기능 |
+|---|---|
+| `RECIPIENT_IMPORT` | Excel 양식 다운로드·검증·확정 반입 |
+| `MAIL_SEND` | 링크 발급과 HTML 메일 Outbox 등록·재발송 |
+| `MAIL_VIEW` | 메일 상태·상세·권한 제한 HTML 미리보기 |
+| `MAIL_RETRY` | 영구 실패 메일의 관리자 재시도 등록 |
+
+### Phase 3B~5 검증 결과
+
+- PostgreSQL 패치·검증: `20260824_004`, 검증 SQL `008` (`seal_test`, `seal_dev` 통과)
+- 전체 자동화 테스트: 194건, 실패·오류·건너뜀 0건
+- 실제 PostgreSQL 통합 흐름: Excel 암호화 반입·즉시 파기, 공개 GET 무상태·POST 완료·멱등, 링크 재발급·암호화 Outbox 취소/재등록
+- 로컬 SMTP: `SEAL_MAIL_ENABLED=false`로 외부 발송 없이 대기열·HTML 미리보기만 검증
+- 실행 산출물과 포트: `target/seal.war`, 9090

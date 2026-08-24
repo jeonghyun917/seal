@@ -1,0 +1,8 @@
+package kr.or.arte.seal.delivery.application;
+import kr.or.arte.seal.recipient.crypto.*;import java.time.*;
+public class MailOutboxWorker{private final MailOutboxRepository repository;private final MailTransport transport;private final PersonalDataCipher cipher;private final boolean enabled;private final Clock clock;
+ public MailOutboxWorker(MailOutboxRepository r,MailTransport t,PersonalDataCipher c,boolean enabled,Clock clock){repository=r;transport=t;cipher=c;this.enabled=enabled;this.clock=clock;}
+ public int processBatch(int limit){if(!enabled)return 0;Instant now=clock.instant();var rows=repository.claimDue(now,limit,now.minus(Duration.ofMinutes(10)));for(var row:rows)process(row,now);return rows.size();}
+ private void process(MailOutboxRecord row,Instant now){int attempt=row.attemptCount()+1;try{String email=decrypt(row,"recipientEmail",row.emailCiphertext());String html=decrypt(row,"html",row.htmlCiphertext());transport.send(new MailMessage(email,row.subject(),html));repository.accepted(row.outboxId(),attempt,now);}catch(MailTransportException e){if(e.temporary()&&attempt<4)repository.retry(row.outboxId(),attempt,now.plus(delay(attempt)),e.reasonCode(),now);else repository.failed(row.outboxId(),attempt,e.reasonCode(),now);}catch(RuntimeException e){repository.failed(row.outboxId(),attempt,"OUTBOX_CONTENT_INVALID",now);}}
+ private String decrypt(MailOutboxRecord r,String field,byte[] bytes){return cipher.decrypt(new PersonalDataContext("MAIL_OUTBOX",r.outboxId(),r.organizationId(),field),new EncryptedValue(r.keyId(),bytes));}
+ private static Duration delay(int attempt){return switch(attempt){case 1->Duration.ofMinutes(1);case 2->Duration.ofMinutes(5);default->Duration.ofMinutes(30);};}}

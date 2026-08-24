@@ -50,6 +50,12 @@ Phase 3A 대상자·요청 기반은 다음 패치를 추가 적용한다.
 
 이 패치는 `target_database` psql 변수를 생략하면 `seal_dev`에 적용한다. 테스트 DB에는 `-v target_database=seal_test`를 명시한다. 적용 전 체크섬을 계산해 `script_checksum`으로 전달한다.
 
+Phase 3B~5 Excel 반입·공개 동의·메일 Outbox는 다음 패치를 추가 적용한다.
+
+1. `database/03_patch/20260824_004_create_import_consent_delivery_tables.sql`
+
+이 패치는 임시 반입·공개 세션·불변 응답·암호화 메일 Outbox 테이블과 관련 권한을 만들고, 공개 제출 이벤트의 `PUBLIC` 행위자 유형을 추가한다. `seal_test` 적용과 검증을 먼저 통과시킨 뒤 동일 체크섬을 `seal_dev`와 운영 DB에 적용한다.
+
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 
 ## 3. 검증
@@ -84,6 +90,17 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
 ```
 
 성공 시 `Phase 3A recipient request verification passed`를 출력한다. 대상자·요청·스냅샷·이력·링크 테이블의 소유권, 복합 외래키, 최소권한, 원문 토큰 컬럼 부재와 SYSTEM_ADMIN 권한을 확인한다.
+
+Phase 3B~5 패치 후에는 같은 방식으로 체크섬을 전달해 검증한다.
+
+```bash
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -v target_database=seal_dev \
+  -v expected_checksum='<sha256sum 결과>' \
+  -f database/04_verify/008_import_consent_delivery_verify.sql
+```
+
+성공 시 `Phase 3B-5 schema verification passed`를 출력한다. 새 테이블 소유권, 앱 계정의 최소권한, 불변 응답·발송시도 수정 거부, Excel 출처와 공개 행위자 제약조건, SYSTEM_ADMIN 권한, 적용 체크섬을 확인한다.
 
 ## 수동 변경 원칙
 

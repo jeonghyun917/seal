@@ -1,0 +1,3 @@
+package kr.or.arte.seal.consent.web;
+import jakarta.servlet.http.HttpServletResponse;import org.springframework.http.HttpStatus;import org.springframework.web.bind.annotation.*;
+@ControllerAdvice(assignableTypes=PublicConsentController.class) public class PublicConsentExceptionHandler{@ExceptionHandler({IllegalArgumentException.class,IllegalStateException.class})@ResponseStatus(HttpStatus.BAD_REQUEST)public String handle(RuntimeException ignored,HttpServletResponse response){response.setHeader("Cache-Control","no-store");response.setHeader("Referrer-Policy","no-referrer");return "consent/error";}}

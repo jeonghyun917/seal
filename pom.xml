@@ -25,6 +25,7 @@
         <egovframe.version>5.0.0</egovframe.version>
         <mybatis-spring-boot.version>3.0.5</mybatis-spring-boot.version>
         <owasp-java-html-sanitizer.version>20260313.1</owasp-java-html-sanitizer.version>
+        <apache-poi.version>5.5.1</apache-poi.version>
     </properties>
 
     <repositories>
@@ -122,6 +123,13 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- XLSX recipient import -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${apache-poi.version}</version>
         </dependency>
 
         <!-- SMTP relay -->

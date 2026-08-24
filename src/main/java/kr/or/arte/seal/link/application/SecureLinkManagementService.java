@@ -34,7 +34,7 @@ public class SecureLinkManagementService {
         Issuance issuance = issue(requestId, actorId, request.expiresAt());
         if (!links.activateRequest(requestId, issuance.linkId(), actorId, clock.instant(), versionNo)) throw conflict();
         requests.insertEvent(requestId, "ACTIVATED", "ADMIN", actorId, null, clock.instant());
-        return new IssuedSecureLink(issuance.token(), request.expiresAt());
+        return new IssuedSecureLink(issuance.linkId(), issuance.token(), request.expiresAt());
     }
 
     @Transactional
@@ -46,7 +46,7 @@ public class SecureLinkManagementService {
         Issuance issuance = issue(requestId, actorId, request.expiresAt());
         if (!links.replaceCurrentLink(requestId, issuance.linkId(), actorId, clock.instant(), versionNo)) throw conflict();
         requests.insertEvent(requestId, "LINK_REISSUED", "ADMIN", actorId, null, clock.instant());
-        return new IssuedSecureLink(issuance.token(), request.expiresAt());
+        return new IssuedSecureLink(issuance.linkId(), issuance.token(), request.expiresAt());
     }
 
     private Issuance issue(UUID requestId, UUID actorId, java.time.Instant expiresAt) {

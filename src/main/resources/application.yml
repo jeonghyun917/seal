@@ -7,6 +7,10 @@ spring:
     view:
       prefix: /WEB-INF/jsp/
       suffix: .jsp
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   datasource:
     driver-class-name: org.postgresql.Driver
     hikari:
@@ -63,6 +67,14 @@ management:
       show-details: never
 
 seal:
+  recipient-import:
+    max-rows: ${SEAL_IMPORT_MAX_ROWS:1000}
+    max-bytes: ${SEAL_IMPORT_MAX_BYTES:5242880}
+  clamav:
+    enabled: ${SEAL_CLAMAV_ENABLED:false}
+    host: ${SEAL_CLAMAV_HOST:127.0.0.1}
+    port: ${SEAL_CLAMAV_PORT:3310}
+    timeout: ${SEAL_CLAMAV_TIMEOUT:5s}
   secure-link:
     hmac-key-file: ${SEAL_LINK_HMAC_KEY_FILE:}
   admin-security:

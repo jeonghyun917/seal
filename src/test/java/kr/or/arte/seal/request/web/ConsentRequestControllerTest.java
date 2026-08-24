@@ -3,6 +3,7 @@ package kr.or.arte.seal.request.web;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
+import kr.or.arte.seal.delivery.application.ConsentDeliveryService;
 import kr.or.arte.seal.link.application.IssuedSecureLink;
 import kr.or.arte.seal.link.application.SecureLinkManagementService;
 import kr.or.arte.seal.recipient.application.RecipientQueryService;
@@ -39,6 +40,7 @@ class ConsentRequestControllerTest {
     @MockitoBean ConsentRequestManagement management;
     @MockitoBean ConsentRequestQueryService query;
     @MockitoBean SecureLinkManagementService links;
+    @MockitoBean ConsentDeliveryService delivery;
     @MockitoBean RecipientQueryService recipients;
     @MockitoBean PublishedConsentTemplateQuery templates;
     @MockitoBean DatabaseAuthenticationProvider databaseAuthenticationProvider;

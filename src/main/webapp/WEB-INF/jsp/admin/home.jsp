@@ -25,6 +25,9 @@
 <div class="admin-layout">
     <nav class="admin-nav" aria-label="관리자 주 메뉴">
         <a class="active" href="${pageContext.request.contextPath}/admin" aria-current="page">대시보드</a>
+        <span class="nav-group">동의 업무</span>
+        <a href="${pageContext.request.contextPath}/admin/recipients">동의 대상자</a>
+        <a href="${pageContext.request.contextPath}/admin/consent-requests">동의 요청</a>
         <span class="nav-group">기준정보</span>
         <a href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
         <a href="${pageContext.request.contextPath}/admin/retention-policies">보유정책</a>
@@ -70,6 +73,12 @@
                 <h2>동의서 템플릿</h2>
                 <p>승인 처리업무 기반의 구조화 동의서와 발행 버전을 관리합니다.</p>
                 <a href="${pageContext.request.contextPath}/admin/templates">템플릿 관리</a>
+            </article>
+            <article class="summary-card">
+                <span class="card-number">05</span>
+                <h2>동의 대상자</h2>
+                <p>암호화 저장과 정확 이메일 검색, 마스킹 조회로 대상자를 관리합니다.</p>
+                <a href="${pageContext.request.contextPath}/admin/recipients">대상자 관리</a>
             </article>
         </section>
 

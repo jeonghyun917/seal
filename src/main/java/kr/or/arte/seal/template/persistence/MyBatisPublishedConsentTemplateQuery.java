@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Repository
 public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTemplateQuery {
@@ -38,6 +39,8 @@ public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTem
         return new PublishedConsentTemplateReference(identity.templateId(), templateVersionId,
                 detail.processingActivityId(), detail.version().processingActivityVersionId(),
                 activity.retentionPolicyVersionId(), activity.retentionDisplayText(),
-                detail.version().contentHash(), renderer.toView(detail, activity));
+                detail.version().contentHash(), renderer.toView(detail, activity),
+                detail.version().items().stream().collect(Collectors.toUnmodifiableMap(
+                        item -> item.order(), item -> item.processingDataItemIds())));
     }
 }

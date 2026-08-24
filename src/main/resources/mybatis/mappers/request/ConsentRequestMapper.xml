@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.request.persistence.ConsentRequestMapper">
+    <sql id="visibleScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{actorId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+            JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+    <resultMap id="requestRecord" type="kr.or.arte.seal.request.application.ConsentRequestRecord">
+        <constructor>
+            <arg column="consent_request_id" javaType="java.util.UUID"/><arg column="request_code" javaType="string"/>
+            <arg column="organization_unit_id" javaType="java.util.UUID"/><arg column="recipient_id" javaType="java.util.UUID"/>
+            <arg column="processing_activity_id" javaType="java.util.UUID"/><arg column="processing_activity_version_id" javaType="java.util.UUID"/>
+            <arg column="consent_template_id" javaType="java.util.UUID"/><arg column="consent_template_version_id" javaType="java.util.UUID"/>
+            <arg column="retention_policy_version_id" javaType="java.util.UUID"/>
+            <arg column="request_status" javaType="kr.or.arte.seal.request.domain.ConsentRequestStatus"/>
+            <arg column="expires_at" javaType="java.time.Instant"/><arg column="idempotency_key" javaType="java.util.UUID"/>
+            <arg column="current_secure_link_id" javaType="java.util.UUID"/><arg column="snapshot_id" javaType="java.util.UUID"/>
+            <arg column="created_by" javaType="java.util.UUID"/><arg column="created_at" javaType="java.time.Instant"/>
+            <arg column="version_no" javaType="_long"/>
+        </constructor>
+    </resultMap>
+    <sql id="columns">request.consent_request_id, request.request_code, request.organization_unit_id,
+        request.recipient_id, request.processing_activity_id, request.processing_activity_version_id,
+        request.consent_template_id, request.consent_template_version_id,
+        request.retention_policy_version_id, request.request_status, request.expires_at,
+        request.idempotency_key, request.current_secure_link_id, request.snapshot_id,
+        request.created_by, request.created_at, request.version_no</sql>
+
+    <select id="findByIdempotency" resultMap="requestRecord">
+        <include refid="visibleScope"/> SELECT <include refid="columns"/>
+        FROM seal.consent_request request JOIN visible_scope scope
+          ON scope.organization_unit_id = request.organization_unit_id
+        WHERE request.organization_unit_id = #{organizationId} AND request.idempotency_key = #{idempotencyKey}
+    </select>
+    <insert id="insert">
+        INSERT INTO seal.consent_request (consent_request_id, request_code, organization_unit_id,
+            recipient_id, processing_activity_id, processing_activity_version_id,
+            consent_template_id, consent_template_version_id, retention_policy_version_id,
+            request_status, expires_at, idempotency_key, created_by, created_at,
+            updated_by, updated_at, version_no)
+        VALUES (#{row.requestId}, #{row.requestCode}, #{row.organizationUnitId}, #{row.recipientId},
+            #{row.processingActivityId}, #{row.processingActivityVersionId}, #{row.templateId},
+            #{row.templateVersionId}, #{row.retentionPolicyVersionId}, #{row.status},
+            #{row.expiresAt}, #{row.idempotencyKey}, #{actorId}, #{now}, #{actorId}, #{now}, 0)
+    </insert>
+    <select id="findScopedForUpdate" resultMap="requestRecord">
+        <include refid="visibleScope"/> SELECT <include refid="columns"/>
+        FROM seal.consent_request request JOIN visible_scope scope
+          ON scope.organization_unit_id = request.organization_unit_id
+        WHERE request.consent_request_id = #{requestId}
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id = #{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id = #{actorId}
+                            AND allowed.processing_activity_id = request.processing_activity_id))
+        FOR UPDATE OF request
+    </select>
+    <insert id="insertSnapshot">
+        INSERT INTO seal.consent_request_snapshot (consent_request_snapshot_id, consent_request_id,
+            snapshot_schema_version, snapshot_json, snapshot_hash, template_content_hash, created_by, created_at)
+        VALUES (#{snapshotId}, #{requestId}, 1, CAST(#{snapshot.canonicalJson} AS jsonb),
+            #{snapshot.snapshotHash}, #{snapshot.templateContentHash}, #{actorId}, #{now})
+    </insert>
+    <insert id="insertItem">
+        INSERT INTO seal.consent_request_item (consent_request_item_id, consent_request_snapshot_id,
+            item_order, item_code, item_type, item_title, required, purpose_text, retention_text,
+            refusal_notice, third_party_recipient)
+        VALUES (#{itemId}, #{snapshotId}, #{item.order}, #{item.code}, #{item.type}, #{item.title},
+            #{item.required}, #{item.purpose}, #{item.retentionText}, #{item.refusalNotice},
+            #{item.thirdPartyRecipient, jdbcType=VARCHAR})
+    </insert>
+    <insert id="insertItemData">
+        INSERT INTO seal.consent_request_item_data (consent_request_item_id,
+            consent_request_snapshot_id, processing_data_item_id, item_order, item_name)
+        VALUES (#{itemId}, #{snapshotId}, #{data.id}, #{data.order}, #{data.name})
+    </insert>
+    <update id="markReady">
+        UPDATE seal.consent_request SET request_status = 'READY', snapshot_id = #{snapshotId},
+            updated_by = #{actorId}, updated_at = #{now}, version_no = version_no + 1
+        WHERE consent_request_id = #{requestId} AND request_status = 'DRAFT' AND version_no = #{versionNo}
+    </update>
+    <update id="cancel">
+        UPDATE seal.consent_request SET request_status = 'CANCELLED', cancelled_by = #{actorId},
+            cancelled_at = #{now}, cancellation_reason = #{reason}, updated_by = #{actorId},
+            updated_at = #{now}, version_no = version_no + 1
+        WHERE consent_request_id = #{requestId} AND version_no = #{versionNo}
+          AND request_status IN ('DRAFT', 'READY', 'ACTIVE')
+    </update>
+    <insert id="insertEvent">
+        INSERT INTO seal.consent_request_event (consent_request_event_id, consent_request_id,
+            event_type, actor_type, actor_id, reason_code, created_at)
+        VALUES (#{eventId}, #{requestId}, #{eventType}, #{actorType},
+            #{actorId, jdbcType=OTHER}, #{reasonCode, jdbcType=VARCHAR}, #{now})
+    </insert>
+    <select id="searchScoped" resultMap="requestRecord">
+        <include refid="visibleScope"/> SELECT <include refid="columns"/>
+        FROM seal.consent_request request JOIN visible_scope scope
+          ON scope.organization_unit_id = request.organization_unit_id
+        <where><if test="status != null">request.request_status = #{status}</if></where>
+        ORDER BY request.created_at DESC, request.consent_request_id LIMIT 100
+    </select>
+</mapper>

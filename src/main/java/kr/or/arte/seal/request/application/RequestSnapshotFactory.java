@@ -28,7 +28,7 @@ public class RequestSnapshotFactory {
                 .sorted(Comparator.comparingInt(item -> item.order()))
                 .map(item -> new RequestSnapshot.Item(item.order(), item.code(), item.type().name(),
                         item.title(), item.required(), item.purpose(), item.retentionText(),
-                        item.refusalNotice(), item.thirdPartyRecipient(), item.dataItemNames())).toList();
+                        item.refusalNotice(), item.thirdPartyRecipient(), dataItems(source, item))).toList();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("schemaVersion", 1);
         payload.put("institution", source.institution());
@@ -56,6 +56,18 @@ public class RequestSnapshotFactory {
 
     private static String normalizeLines(String value) {
         return value.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private static List<RequestSnapshot.DataItem> dataItems(RequestSnapshotSource source,
+            kr.or.arte.seal.template.application.PublishedTemplateView.Item item) {
+        List<java.util.UUID> ids = source.dataItemIdsByItemOrder().getOrDefault(item.order(), List.of());
+        if (!ids.isEmpty() && ids.size() != item.dataItemNames().size()) {
+            throw new IllegalArgumentException("스냅샷 개인정보 항목 참조가 일치하지 않습니다.");
+        }
+        return java.util.stream.IntStream.range(0, item.dataItemNames().size())
+                .mapToObj(index -> new RequestSnapshot.DataItem(
+                        ids.isEmpty() ? new java.util.UUID(0, index + 1) : ids.get(index),
+                        index + 1, item.dataItemNames().get(index))).toList();
     }
 
     private static String sha256(String value) {

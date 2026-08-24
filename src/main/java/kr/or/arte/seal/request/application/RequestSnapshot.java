@@ -8,7 +8,9 @@ public record RequestSnapshot(String canonicalJson, String snapshotHash,
 
     public record Item(int order, String code, String type, String title, boolean required,
                        String purpose, String retentionText, String refusalNotice,
-                       String thirdPartyRecipient, List<String> dataItemNames) {
-        public Item { dataItemNames = List.copyOf(dataItemNames); }
+                       String thirdPartyRecipient, List<DataItem> dataItems) {
+        public Item { dataItems = List.copyOf(dataItems); }
     }
+
+    public record DataItem(java.util.UUID id, int order, String name) { }
 }

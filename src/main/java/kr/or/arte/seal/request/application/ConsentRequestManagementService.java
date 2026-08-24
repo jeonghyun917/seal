@@ -2,6 +2,7 @@ package kr.or.arte.seal.request.application;
 
 import kr.or.arte.seal.audit.application.AuditEventCommand;
 import kr.or.arte.seal.audit.application.AuditEventWriter;
+import kr.or.arte.seal.link.application.SecureLinkRepository;
 import kr.or.arte.seal.recipient.application.RecipientRepository;
 import kr.or.arte.seal.recipient.domain.RecipientStatus;
 import kr.or.arte.seal.request.domain.ConsentRequest;
@@ -29,14 +30,16 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
     private final PublishedConsentTemplateQuery templates;
     private final RequestSnapshotFactory snapshots;
     private final AuditEventWriter auditWriter;
+    private final SecureLinkRepository links;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public ConsentRequestManagementService(ConsentRequestRepository repository,
             RecipientRepository recipients, PublishedConsentTemplateQuery templates,
-            RequestSnapshotFactory snapshots, AuditEventWriter auditWriter, Clock clock) {
+            RequestSnapshotFactory snapshots, AuditEventWriter auditWriter,
+            SecureLinkRepository links, Clock clock) {
         this.repository = repository; this.recipients = recipients; this.templates = templates;
-        this.snapshots = snapshots; this.auditWriter = auditWriter; this.clock = clock;
+        this.snapshots = snapshots; this.auditWriter = auditWriter; this.links = links; this.clock = clock;
     }
 
     @Override
@@ -106,6 +109,7 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         new ConsentRequest(row.requestId(), row.requestCode(), row.organizationUnitId(), row.recipientId(),
                 row.templateVersionId(), row.createdBy(), row.status(), row.expiresAt(), row.snapshotId(),
                 row.currentSecureLinkId(), row.versionNo()).cancel();
+        links.revokeCurrent(requestId, actorId, clock.instant(), "REQUEST_CANCELLED");
         if (!repository.cancel(requestId, actorId, clock.instant(), reason.strip(), versionNo)) throw conflict();
         repository.insertEvent(requestId, "CANCELLED", "ADMIN", actorId, "ADMIN_CANCEL", clock.instant());
         audit("CONSENT_REQUEST_CANCEL", row, actorId, "ADMIN_CANCEL");

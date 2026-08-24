@@ -1,6 +1,8 @@
 package kr.or.arte.seal.request.application;
 
 import kr.or.arte.seal.audit.application.AuditEventCommand;
+import kr.or.arte.seal.link.application.SecureLinkInsert;
+import kr.or.arte.seal.link.application.SecureLinkRepository;
 import kr.or.arte.seal.recipient.application.RecipientRepository;
 import kr.or.arte.seal.recipient.application.RecipientStoredRecord;
 import kr.or.arte.seal.recipient.domain.RecipientStatus;
@@ -44,7 +46,7 @@ class ConsentRequestManagementServiceTest {
         List<AuditEventCommand> audits = new ArrayList<>();
         service = new ConsentRequestManagementService(requests, recipients, templates,
                 new RequestSnapshotFactory(new com.fasterxml.jackson.databind.ObjectMapper()), audits::add,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                new NoOpLinkRepository(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -125,5 +127,12 @@ class ConsentRequestManagementServiceTest {
         @Override public Optional<RecipientStoredRecord> findScoped(UUID a, UUID id) { return RECIPIENT.equals(id) ? Optional.of(row) : Optional.empty(); }
         @Override public boolean update(RecipientStoredRecord r, UUID a, Instant n, long v) { return false; }
         @Override public List<RecipientStoredRecord> searchScoped(UUID a, String h, RecipientStatus s) { return List.of(row); }
+    }
+
+    private static final class NoOpLinkRepository implements SecureLinkRepository {
+        @Override public void insert(SecureLinkInsert value) { }
+        @Override public void revokeCurrent(UUID requestId, UUID actorId, Instant now, String reason) { }
+        @Override public boolean activateRequest(UUID r, UUID l, UUID a, Instant n, long v) { return false; }
+        @Override public boolean replaceCurrentLink(UUID r, UUID l, UUID a, Instant n, long v) { return false; }
     }
 }

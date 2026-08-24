@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.link.persistence.SecureLinkMapper">
+    <insert id="insert">
+        INSERT INTO seal.secure_link (secure_link_id, consent_request_id, token_hmac,
+            link_status, expires_at, issued_by, issued_at, version_no)
+        VALUES (#{value.linkId}, #{value.requestId}, #{value.tokenHmac}, #{value.status},
+            #{value.expiresAt}, #{value.issuedBy}, #{value.issuedAt}, 0)
+    </insert>
+    <update id="revokeCurrent">
+        UPDATE seal.secure_link link SET link_status='REVOKED', revoked_by=#{actorId},
+            revoked_at=#{now}, revoke_reason=#{reason}, version_no=link.version_no+1
+        FROM seal.consent_request request
+        WHERE request.consent_request_id=#{requestId}
+          AND link.secure_link_id=request.current_secure_link_id
+          AND link.link_status IN ('ISSUED','ACCESSED')
+    </update>
+    <update id="activateRequest">
+        UPDATE seal.consent_request SET request_status='ACTIVE', current_secure_link_id=#{linkId},
+            updated_by=#{actorId}, updated_at=#{now}, version_no=version_no+1
+        WHERE consent_request_id=#{requestId} AND request_status='READY' AND version_no=#{versionNo}
+    </update>
+    <update id="replaceCurrentLink">
+        UPDATE seal.consent_request SET current_secure_link_id=#{linkId}, updated_by=#{actorId},
+            updated_at=#{now}, version_no=version_no+1
+        WHERE consent_request_id=#{requestId} AND request_status='ACTIVE' AND version_no=#{versionNo}
+    </update>
+</mapper>

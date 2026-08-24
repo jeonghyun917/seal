@@ -2,6 +2,7 @@ package kr.or.arte.seal.request.persistence;
 
 import kr.or.arte.seal.recipient.application.CreateRecipientCommand;
 import kr.or.arte.seal.recipient.application.RecipientManagementService;
+import kr.or.arte.seal.link.application.SecureLinkManagementService;
 import kr.or.arte.seal.request.application.ConsentRequestManagementService;
 import kr.or.arte.seal.request.application.CreateConsentRequestCommand;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ class ConsentRequestPostgresIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RecipientManagementService recipients;
     @Autowired ConsentRequestManagementService requests;
+    @Autowired SecureLinkManagementService links;
 
     @Test
     void createsAndFinalizesRequestWithImmutableSnapshotRows() {
@@ -36,11 +38,20 @@ class ConsentRequestPostgresIntegrationTest {
         var created = requests.create(actor, new CreateConsentRequestCommand(org, recipient,
                 fixture.templateVersionId(), Instant.now().plusSeconds(7200), UUID.randomUUID()));
         requests.finalizeRequest(actor, created.requestId(), 0);
+        var issued = links.activate(actor, created.requestId(), 1);
+        var reissued = links.reissue(actor, created.requestId(), 2);
 
         assertThat(jdbc.queryForObject("SELECT request_status FROM seal.consent_request WHERE consent_request_id=?",
-                String.class, created.requestId())).isEqualTo("READY");
+                String.class, created.requestId())).isEqualTo("ACTIVE");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_request_snapshot WHERE consent_request_id=?",
                 Integer.class, created.requestId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT token_hmac FROM seal.secure_link WHERE consent_request_id=? AND link_status='ISSUED'",
+                String.class, created.requestId())).hasSize(64).isNotEqualTo(reissued.token());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.secure_link WHERE consent_request_id=? AND link_status='REVOKED'",
+                Integer.class, created.requestId())).isEqualTo(1);
+        requests.cancel(actor, created.requestId(), 3, "통합테스트 관리자 취소");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.secure_link WHERE consent_request_id=? AND link_status IN ('ISSUED','ACCESSED')",
+                Integer.class, created.requestId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_request_item_data data JOIN seal.consent_request_item item ON item.consent_request_item_id=data.consent_request_item_id JOIN seal.consent_request_snapshot snapshot ON snapshot.consent_request_snapshot_id=item.consent_request_snapshot_id WHERE snapshot.consent_request_id=?",
                 Integer.class, created.requestId())).isEqualTo(1);
     }

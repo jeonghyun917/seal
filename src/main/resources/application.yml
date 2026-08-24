@@ -63,6 +63,8 @@ management:
       show-details: never
 
 seal:
+  secure-link:
+    hmac-key-file: ${SEAL_LINK_HMAC_KEY_FILE:}
   admin-security:
     max-login-failures: ${SEAL_ADMIN_MAX_LOGIN_FAILURES:5}
     temporary-lock-duration: ${SEAL_ADMIN_LOCK_DURATION:15m}

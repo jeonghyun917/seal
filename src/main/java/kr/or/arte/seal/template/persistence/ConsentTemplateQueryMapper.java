@@ -17,4 +17,6 @@ public interface ConsentTemplateQueryMapper {
                                           @Param("templateId") UUID templateId);
     List<ConsentTemplateVersionSummary> findVersions(@Param("actorId") UUID actorId,
                                                      @Param("templateId") UUID templateId);
+    List<PublishedTemplateIdentityRow> findPublishedIdentity(@Param("actorId") UUID actorId,
+                                                              @Param("templateVersionId") UUID templateVersionId);
 }

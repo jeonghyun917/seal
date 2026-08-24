@@ -70,4 +70,26 @@
          WHERE template.consent_template_id = #{templateId}
          ORDER BY version.version_number DESC
     </select>
+
+    <select id="findPublishedIdentity" resultType="kr.or.arte.seal.template.persistence.PublishedTemplateIdentityRow">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id AS template_id,
+               version.consent_template_version_id AS template_version_id
+          FROM seal.consent_template_version version
+          JOIN seal.consent_template template ON template.consent_template_id = version.consent_template_id
+          JOIN seal.processing_activity activity ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE version.consent_template_version_id = #{templateVersionId}
+           AND version.workflow_status IN ('PUBLISHED', 'RETIRED')
+           AND version.content_hash IS NOT NULL
+           AND template.template_status = 'ACTIVE'
+           AND activity.activity_status = 'ACTIVE'
+           AND (
+                NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                             WHERE configured.admin_user_id = #{actorId})
+                OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                           WHERE allowed.admin_user_id = #{actorId}
+                             AND allowed.processing_activity_id = activity.processing_activity_id)
+           )
+    </select>
 </mapper>

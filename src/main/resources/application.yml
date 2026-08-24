@@ -78,3 +78,7 @@ seal:
     auth-enabled: false
     from-address: ${SEAL_MAIL_FROM_ADDRESS:no-reply@arte.or.kr}
     from-name: ${SEAL_MAIL_FROM_NAME:개인정보 동의 안내}
+  personal-data:
+    active-key-id: ${SEAL_DATA_ACTIVE_KEY_ID:}
+    keys-file: ${SEAL_DATA_KEYS_FILE:}
+    email-index-hmac-key-file: ${SEAL_EMAIL_INDEX_HMAC_KEY_FILE:}

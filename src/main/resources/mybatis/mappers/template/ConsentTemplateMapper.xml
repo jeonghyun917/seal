@@ -77,6 +77,28 @@
          FOR UPDATE OF template, version
     </select>
 
+    <select id="findVisibleVersion" resultType="kr.or.arte.seal.template.persistence.ConsentTemplateHeaderRow">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id, template.template_code, template.template_name,
+               template.processing_activity_id, activity.activity_name AS processing_activity_name,
+               template.template_status, template.current_published_version_id,
+               template.version_no AS template_version_no,
+               version.consent_template_version_id, version.processing_activity_version_id,
+               version.version_number, version.workflow_status, version.title,
+               version.introduction_html, version.created_by, version.review_requested_by,
+               version.approved_by, version.published_by, version.rejection_comment,
+               version.content_hash, version.version_no
+          FROM seal.consent_template template
+          JOIN seal.consent_template_version version
+            ON version.consent_template_id = template.consent_template_id
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE template.consent_template_id = #{templateId}
+           AND version.consent_template_version_id = #{versionId}
+    </select>
+
     <select id="findItems" resultType="kr.or.arte.seal.template.persistence.ConsentItemRow">
         SELECT consent_item_definition_id AS item_id, item_order, item_code, item_type,
                item_title, required, purpose_text, retention_text, refusal_notice,

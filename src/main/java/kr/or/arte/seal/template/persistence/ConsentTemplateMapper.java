@@ -23,6 +23,9 @@ public interface ConsentTemplateMapper {
     List<ConsentTemplateHeaderRow> findVisibleVersionForUpdate(
             @Param("actorId") UUID actorId, @Param("templateId") UUID templateId,
             @Param("versionId") UUID versionId);
+    List<ConsentTemplateHeaderRow> findVisibleVersion(
+            @Param("actorId") UUID actorId, @Param("templateId") UUID templateId,
+            @Param("versionId") UUID versionId);
     List<ConsentItemRow> findItems(@Param("versionId") UUID versionId);
     List<ConsentDataSelectionRow> findSelections(@Param("versionId") UUID versionId);
     int clearDraftItems(@Param("versionId") UUID versionId, @Param("actorId") UUID actorId);

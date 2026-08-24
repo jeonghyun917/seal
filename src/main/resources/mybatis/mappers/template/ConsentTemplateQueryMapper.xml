@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.template.persistence.ConsentTemplateQueryMapper">
+    <sql id="visibleScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants FROM seal.user_scope
+             WHERE admin_user_id = #{actorId} AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+
+    <select id="search" resultType="kr.or.arte.seal.template.application.ConsentTemplateSummary">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id, template.template_code, template.template_name,
+               activity.activity_name AS processing_activity_name, template.template_status,
+               published.version_number AS published_version_number,
+               latest.workflow_status AS latest_workflow_status
+          FROM seal.consent_template template
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+          LEFT JOIN seal.consent_template_version published
+            ON published.consent_template_version_id = template.current_published_version_id
+          LEFT JOIN LATERAL (
+              SELECT workflow_status FROM seal.consent_template_version version
+               WHERE version.consent_template_id = template.consent_template_id
+               ORDER BY version.version_number DESC LIMIT 1
+          ) latest ON TRUE
+         WHERE (#{keyword, jdbcType=VARCHAR} IS NULL
+                OR template.template_code ILIKE '%' || #{keyword} || '%'
+                OR template.template_name ILIKE '%' || #{keyword} || '%')
+           AND (#{status, jdbcType=VARCHAR} IS NULL OR template.template_status = #{status})
+         ORDER BY template.template_code
+    </select>
+
+    <select id="findPage" resultType="kr.or.arte.seal.template.persistence.ConsentTemplatePageRow">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id, template.template_code, template.template_name,
+               template.processing_activity_id, activity.activity_name AS processing_activity_name,
+               template.template_status, template.current_published_version_id, template.version_no
+          FROM seal.consent_template template
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+         WHERE template.consent_template_id = #{templateId}
+    </select>
+
+    <select id="findVersions" resultType="kr.or.arte.seal.template.application.ConsentTemplateVersionSummary">
+        <include refid="visibleScope"/>
+        SELECT version.consent_template_version_id, version.version_number,
+               version.workflow_status, version.title,
+               creator.display_name AS created_by_name,
+               approver.display_name AS approved_by_name,
+               publisher.display_name AS published_by_name
+          FROM seal.consent_template_version version
+          JOIN seal.consent_template template
+            ON template.consent_template_id = version.consent_template_id
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+          JOIN seal.admin_user creator ON creator.admin_user_id = version.created_by
+          LEFT JOIN seal.admin_user approver ON approver.admin_user_id = version.approved_by
+          LEFT JOIN seal.admin_user publisher ON publisher.admin_user_id = version.published_by
+         WHERE template.consent_template_id = #{templateId}
+         ORDER BY version.version_number DESC
+    </select>
+</mapper>

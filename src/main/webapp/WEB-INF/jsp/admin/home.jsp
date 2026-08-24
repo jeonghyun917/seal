@@ -29,6 +29,7 @@
         <a href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
         <a href="${pageContext.request.contextPath}/admin/retention-policies">보유정책</a>
         <a href="${pageContext.request.contextPath}/admin/processing-activities">처리업무</a>
+        <a href="${pageContext.request.contextPath}/admin/templates">동의서 템플릿</a>
         <span class="nav-group">시스템 관리</span>
         <a href="${pageContext.request.contextPath}/admin/users">관리자 계정</a>
         <a href="${pageContext.request.contextPath}/admin/roles">역할·권한</a>
@@ -63,6 +64,12 @@
                 <h2>처리업무 관리</h2>
                 <p>목적·근거·개인정보 항목과 승인 정책을 연결합니다.</p>
                 <span class="state-text pending">다음 개발 단위</span>
+            </article>
+            <article class="summary-card">
+                <span class="card-number">04</span>
+                <h2>동의서 템플릿</h2>
+                <p>승인 처리업무 기반의 구조화 동의서와 발행 버전을 관리합니다.</p>
+                <a href="${pageContext.request.contextPath}/admin/templates">템플릿 관리</a>
             </article>
         </section>
 

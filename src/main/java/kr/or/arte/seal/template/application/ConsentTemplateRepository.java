@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface ConsentTemplateRepository {
     void insertTemplate(ConsentTemplateDetail draft, UUID actorId, Instant now);
     ConsentTemplateDetail requireVersionForUpdate(UUID actorId, UUID templateId, UUID versionId);
+    ConsentTemplateDetail requireVersion(UUID actorId, UUID templateId, UUID versionId);
     void replaceDraft(ConsentTemplateVersion draft, UUID actorId, Instant now);
     void updateTemplateName(UUID templateId, String templateName, long versionNo,
                             UUID actorId, Instant now);

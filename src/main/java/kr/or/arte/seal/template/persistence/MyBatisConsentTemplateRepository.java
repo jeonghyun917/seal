@@ -32,7 +32,16 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
     @Override
     @Transactional
     public ConsentTemplateDetail requireVersionForUpdate(UUID actorId, UUID templateId, UUID versionId) {
-        List<ConsentTemplateHeaderRow> rows = mapper.findVisibleVersionForUpdate(actorId, templateId, versionId);
+        return load(mapper.findVisibleVersionForUpdate(actorId, templateId, versionId), versionId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConsentTemplateDetail requireVersion(UUID actorId, UUID templateId, UUID versionId) {
+        return load(mapper.findVisibleVersion(actorId, templateId, versionId), versionId);
+    }
+
+    private ConsentTemplateDetail load(List<ConsentTemplateHeaderRow> rows, UUID versionId) {
         if (rows.size() != 1) {
             throw new IllegalArgumentException("동의서 템플릿을 찾을 수 없습니다.");
         }

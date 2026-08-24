@@ -3,6 +3,7 @@ package kr.or.arte.seal.template.persistence;
 import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityQuery;
 import kr.or.arte.seal.template.application.ConsentTemplateDetail;
 import kr.or.arte.seal.template.application.ConsentTemplateManagement;
+import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.ConsentTemplateRepository;
 import kr.or.arte.seal.template.domain.ConsentItemDefinition;
 import kr.or.arte.seal.template.domain.ConsentItemType;
@@ -31,6 +32,7 @@ class ConsentTemplatePostgresIntegrationTest {
 
     @Autowired ConsentTemplateRepository repository;
     @Autowired ConsentTemplateManagement management;
+    @Autowired ConsentTemplateQueryService queryService;
     @Autowired ApprovedProcessingActivityQuery approvedActivityQuery;
     @Autowired JdbcTemplate jdbcTemplate;
 
@@ -71,6 +73,12 @@ class ConsentTemplatePostgresIntegrationTest {
                 fixture.authorId(), templateId, versionId);
         assertThat(loaded.version().items()).extracting(ConsentItemDefinition::order)
                 .containsExactly(1, 2);
+        assertThat(queryService.search(fixture.authorId(), "교육 프로그램", "ACTIVE"))
+                .singleElement().satisfies(summary ->
+                        assertThat(summary.consentTemplateId()).isEqualTo(templateId));
+        assertThat(queryService.requireScoped(templateId, fixture.authorId()).versions())
+                .singleElement().satisfies(summary ->
+                        assertThat(summary.consentTemplateVersionId()).isEqualTo(versionId));
 
         ConsentTemplateVersion changed = loaded.version().changeContent(
                 "수정된 교육 프로그램 개인정보 동의서",

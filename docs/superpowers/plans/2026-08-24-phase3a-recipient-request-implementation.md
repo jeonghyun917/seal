@@ -647,7 +647,7 @@ Verified login with the configured administrator and the recipient create/detail
 
 Document key file creation, SQL order, URLs, permissions, masking, excluded 3B/4/5 functionality, and exact test evidence. Change only completed plan steps to `[x]`.
 
-- [ ] **Step 7: Final review, commit, and push**
+- [x] **Step 7: Final review, commit, and push**
 
 Run `git diff --check`, secret scan for actual key/token/email fixtures, `git status --short`, and `git log --oneline origin/feature/phase2-template..HEAD`. Commit documentation as `docs: 3A 대상자 요청 검증 절차 기록` and push `feature/phase3a-recipient-request` to the private GitHub repository. Do not merge to main without explicit user direction.
 

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.recipient.persistence.RecipientMapper">
+    <sql id="visibleOrganizationScope">
+        WITH RECURSIVE visible_scope (organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants
+              FROM seal.user_scope
+             WHERE admin_user_id = #{actorId}
+               AND scope_type = 'ORGANIZATION' AND active = TRUE
+            UNION
+            SELECT child.organization_unit_id, TRUE
+              FROM seal.organization_unit child
+              JOIN visible_scope parent_scope ON child.parent_id = parent_scope.organization_unit_id
+             WHERE parent_scope.include_descendants = TRUE
+        )
+    </sql>
+
+    <resultMap id="recipientRecord" type="kr.or.arte.seal.recipient.application.RecipientStoredRecord">
+        <constructor>
+            <arg column="recipient_id" javaType="java.util.UUID"/>
+            <arg column="organization_unit_id" javaType="java.util.UUID"/>
+            <arg column="recipient_name_ciphertext" javaType="_byte[]"/>
+            <arg column="recipient_email_ciphertext" javaType="_byte[]"/>
+            <arg column="encryption_key_id" javaType="java.lang.String"/>
+            <arg column="email_lookup_hmac" javaType="java.lang.String"/>
+            <arg column="collection_basis" javaType="java.lang.String"/>
+            <arg column="recipient_status" javaType="kr.or.arte.seal.recipient.domain.RecipientStatus"/>
+            <arg column="version_no" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="recipientColumns">
+        recipient.recipient_id, recipient.organization_unit_id,
+        recipient.recipient_name_ciphertext, recipient.recipient_email_ciphertext,
+        recipient.encryption_key_id, recipient.email_lookup_hmac,
+        recipient.collection_basis, recipient.recipient_status, recipient.version_no
+    </sql>
+
+    <select id="canAccessActiveOrganization" resultType="boolean">
+        <include refid="visibleOrganizationScope"/>
+        SELECT EXISTS (
+            SELECT 1 FROM visible_scope scope
+            JOIN seal.organization_unit organization
+              ON organization.organization_unit_id = scope.organization_unit_id
+            WHERE organization.organization_unit_id = #{organizationId} AND organization.active = TRUE
+        )
+    </select>
+
+    <select id="findActiveByEmailHmac" resultMap="recipientRecord">
+        SELECT <include refid="recipientColumns"/> FROM seal.recipient recipient
+         WHERE recipient.organization_unit_id = #{organizationId}
+           AND recipient.email_lookup_hmac = #{emailLookupHmac}
+           AND recipient.recipient_status = 'ACTIVE'
+        <if test="excludedRecipientId != null">
+           AND recipient.recipient_id &lt;&gt; #{excludedRecipientId}
+        </if>
+         LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO seal.recipient (recipient_id, organization_unit_id,
+            recipient_name_ciphertext, recipient_email_ciphertext, encryption_key_id,
+            email_lookup_hmac, collection_source, collection_basis, recipient_status,
+            created_by, created_at, updated_by, updated_at, version_no)
+        VALUES (#{record.recipientId}, #{record.organizationUnitId},
+            #{record.nameCiphertext}, #{record.emailCiphertext}, #{record.encryptionKeyId},
+            #{record.emailLookupHmac}, 'MANUAL', #{record.collectionBasis},
+            #{record.status}, #{actorId}, #{now}, #{actorId}, #{now}, #{record.versionNo})
+    </insert>
+
+    <select id="findScoped" resultMap="recipientRecord">
+        <include refid="visibleOrganizationScope"/>
+        SELECT <include refid="recipientColumns"/> FROM seal.recipient recipient
+        JOIN visible_scope scope ON scope.organization_unit_id = recipient.organization_unit_id
+        WHERE recipient.recipient_id = #{recipientId}
+        FOR UPDATE
+    </select>
+
+    <update id="update">
+        UPDATE seal.recipient SET
+            recipient_name_ciphertext = #{record.nameCiphertext},
+            recipient_email_ciphertext = #{record.emailCiphertext},
+            encryption_key_id = #{record.encryptionKeyId},
+            email_lookup_hmac = #{record.emailLookupHmac},
+            collection_basis = #{record.collectionBasis},
+            recipient_status = #{record.status},
+            updated_by = #{actorId}, updated_at = #{now}, version_no = version_no + 1
+        WHERE recipient_id = #{record.recipientId} AND version_no = #{expectedVersion}
+    </update>
+
+    <select id="searchScoped" resultMap="recipientRecord">
+        <include refid="visibleOrganizationScope"/>
+        SELECT <include refid="recipientColumns"/> FROM seal.recipient recipient
+        JOIN visible_scope scope ON scope.organization_unit_id = recipient.organization_unit_id
+        <where>
+            <if test="emailLookupHmac != null">recipient.email_lookup_hmac = #{emailLookupHmac}</if>
+            <if test="status != null">AND recipient.recipient_status = #{status}</if>
+        </where>
+        ORDER BY recipient.created_at DESC, recipient.recipient_id
+        LIMIT 100
+    </select>
+</mapper>

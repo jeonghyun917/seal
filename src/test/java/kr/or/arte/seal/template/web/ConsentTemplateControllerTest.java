@@ -7,6 +7,7 @@ import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityQue
 import kr.or.arte.seal.template.application.ConsentTemplateManagement;
 import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.TemplateNotFoundException;
+import kr.or.arte.seal.template.application.TemplatePreviewRenderer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,6 +44,7 @@ class ConsentTemplateControllerTest {
     @MockitoBean ConsentTemplateManagement management;
     @MockitoBean ConsentTemplateQueryService query;
     @MockitoBean ApprovedProcessingActivityQuery approvedActivityQuery;
+    @MockitoBean TemplatePreviewRenderer previewRenderer;
     @MockitoBean DatabaseAuthenticationProvider databaseAuthenticationProvider;
 
     @Test

@@ -151,6 +151,9 @@ class ConsentTemplatePostgresIntegrationTest {
                 SELECT count(*) FROM seal.template_review
                  WHERE consent_template_version_id = ?
                 """, Integer.class, versionId)).isEqualTo(3);
+        assertThat(approvedActivityQuery.findReferenceForExistingTemplate(
+                fixture.reviewerId(), fixture.activityVersionId()).dataItems())
+                .extracting(item -> item.itemName()).containsExactly("성명", "이메일");
     }
 
     private Fixture fixture() {

@@ -32,6 +32,18 @@ public class MyBatisApprovedProcessingActivityQuery implements ApprovedProcessin
         return mapper.findAllApprovedForTemplate(actorId).stream().map(this::toReference).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ApprovedProcessingActivityReference findReferenceForExistingTemplate(
+            UUID actorId, UUID versionId) {
+        List<ApprovedProcessingActivityRow> rows = mapper.findReferenceForExistingTemplate(
+                actorId, versionId);
+        if (rows.size() != 1) {
+            throw new IllegalArgumentException("템플릿 처리업무 참조를 찾을 수 없습니다.");
+        }
+        return toReference(rows.get(0));
+    }
+
     private ApprovedProcessingActivityReference toReference(ApprovedProcessingActivityRow row) {
         return new ApprovedProcessingActivityReference(row.activityId(), row.versionId(),
                 row.ownerOrganizationId(), row.activityName(), row.processingPurpose(),

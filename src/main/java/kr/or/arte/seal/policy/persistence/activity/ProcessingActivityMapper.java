@@ -36,6 +36,9 @@ public interface ProcessingActivityMapper {
             @Param("processingActivityVersionId") UUID processingActivityVersionId);
     List<ApprovedProcessingActivityRow> findAllApprovedForTemplate(
             @Param("adminUserId") UUID adminUserId);
+    List<ApprovedProcessingActivityRow> findReferenceForExistingTemplate(
+            @Param("adminUserId") UUID adminUserId,
+            @Param("processingActivityVersionId") UUID processingActivityVersionId);
     List<ApprovedDataItemReference> findApprovedDataItems(
             @Param("processingActivityVersionId") UUID processingActivityVersionId);
 }

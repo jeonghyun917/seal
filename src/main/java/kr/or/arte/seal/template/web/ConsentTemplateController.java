@@ -9,6 +9,7 @@ import kr.or.arte.seal.template.application.ConsentTemplateManagement;
 import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.CreateConsentTemplateCommand;
 import kr.or.arte.seal.template.application.UpdateConsentTemplateDraftCommand;
+import kr.or.arte.seal.template.application.TemplatePreviewRenderer;
 import kr.or.arte.seal.template.domain.ConsentItemType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,13 +31,16 @@ public class ConsentTemplateController {
     private final ConsentTemplateManagement management;
     private final ConsentTemplateQueryService query;
     private final ApprovedProcessingActivityQuery approvedActivityQuery;
+    private final TemplatePreviewRenderer previewRenderer;
 
     public ConsentTemplateController(ConsentTemplateManagement management,
             ConsentTemplateQueryService query,
-            ApprovedProcessingActivityQuery approvedActivityQuery) {
+            ApprovedProcessingActivityQuery approvedActivityQuery,
+            TemplatePreviewRenderer previewRenderer) {
         this.management = management;
         this.query = query;
         this.approvedActivityQuery = approvedActivityQuery;
+        this.previewRenderer = previewRenderer;
     }
 
     @GetMapping("/admin/templates")
@@ -115,8 +119,12 @@ public class ConsentTemplateController {
     public String preview(@PathVariable UUID templateId, @PathVariable UUID versionId,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("detail", query.requireVersionScoped(templateId, versionId,
-                principal.adminUserId()));
+        ConsentTemplateDetail detail = query.requireVersionScoped(templateId, versionId,
+                principal.adminUserId());
+        var policy = approvedActivityQuery.findReferenceForExistingTemplate(
+                principal.adminUserId(), detail.version().processingActivityVersionId());
+        model.addAttribute("detail", detail);
+        model.addAttribute("preview", previewRenderer.toView(detail, policy));
         return "admin/templates/preview";
     }
 

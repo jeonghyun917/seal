@@ -13,6 +13,7 @@ target/
 # Runtime and local configuration
 logs/
 *.log
+.local-data/
 .env
 .env.*
 !.env.example

@@ -1,0 +1,1 @@
+package kr.or.arte.seal.statistics.application;import java.time.LocalDate;import java.util.UUID;@FunctionalInterface public interface StatisticsRepository {StatisticsSnapshot query(UUID actor,LocalDate from,LocalDate to);}

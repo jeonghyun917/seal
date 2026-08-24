@@ -88,6 +88,10 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `http://localhost:9090/admin/requests`
 - `http://localhost:9090/admin/requests/new`
 - `http://localhost:9090/admin/mail-outbox`
+- `http://localhost:9090/admin/evidence-packages`
+- `http://localhost:9090/admin/rights-requests`
+- `http://localhost:9090/admin/retention-jobs`
+- `http://localhost:9090/admin/statistics`
 - `http://localhost:9090/actuator/health`
 
 로컬 프로필에서는 실제 메일 발송이 비활성화된다. SMTP 테스트는 Rocky Linux 공인 IP 등록 후 승인된 수신 주소로만 수행한다.
@@ -191,3 +195,32 @@ HTML 이메일은 확정 요청 스냅샷을 웹 화면과 함께 단일 원본�
 - 실제 PostgreSQL 통합 흐름: Excel 암호화 반입·즉시 파기, 공개 GET 무상태·POST 완료·멱등, 링크 재발급·암호화 Outbox 취소/재등록
 - 로컬 SMTP: `SEAL_MAIL_ENABLED=false`로 외부 발송 없이 대기열·HTML 미리보기만 검증
 - 실행 산출물과 포트: `target/seal.war`, 9090
+
+## Phase 6 증적·권리요청·보유기간 수명주기
+
+동의 완료 트랜잭션은 증적 생성 작업을 한 번만 등록한다. 내부 워커는 `evidence.pdf`, 요청·결정·이벤트 JSON, canonical 매니페스트와 HMAC-SHA256을 개인정보가 없는 패키지로 생성한다. 관리자는 권한과 조직 범위 안에서 패키지를 조회·재검증하며, 다운로드 직전 HMAC과 파일 해시가 모두 유효할 때만 `no-store` ZIP을 받을 수 있다.
+
+권리요청은 기관 외부 절차에서 본인확인을 마친 건만 관리자가 접수한다. 열람·정정·삭제·처리정지·철회의 상태와 암호화 메모를 관리하고 등록자와 결정자를 분리한다. 삭제는 긴급 파기 작업이 `CONFIRMED`된 뒤 완료되고, 처리정지는 보존 보류를 설정하며, 반려된 요청은 실제 개인정보 동작 없이 통지 완료만 기록한다.
+
+보유기간 작업은 승인 정책과 기산일로 예정일을 계산한다. 프로그램 종료일·목적 달성일은 기존 값을 삭제하지 않는 버전 이력으로 등록하고, 법적·업무상 보존 보류는 근거와 만료일을 기록해 설정·해제한다. 파기는 요청·승인·실행·확인 행위자를 분리하고 같은 멱등키의 재실행만 허용한다. 현재 애플리케이션 파기 범위는 운영 주 DB의 암호화 메일·직접 식별자와 주 증적 저장소이며 백업본·물리 매체는 포함하지 않는다.
+
+통계는 최근 30일을 기본으로 최대 1년 동안 조직 범위 내 요청, 응답·철회, 메일, 증적·검증 실패, 권리요청·기한 초과, 파기·보존 보류 건수만 제공한다. 이름·이메일·대상자 UUID·자유 입력 메모는 통계 DTO와 화면에 포함하지 않는다.
+
+Phase 6 로컬 설정에는 서로 분리된 증적 HMAC 키가 추가된다.
+
+```powershell
+$env:SEAL_EVIDENCE_ROOT = 'C:\dev\workspace-egov\seal\.local-data\evidence'
+$env:SEAL_EVIDENCE_HMAC_KEY_FILE = 'C:\tmp\seal-keys\evidence-hmac.key'
+$env:SEAL_EVIDENCE_WORKER_ENABLED = 'true'
+```
+
+`SEAL_EVIDENCE_HMAC_KEY_FILE`은 저장소 밖의 32바이트 난수 파일이어야 한다. `.local-data`, 키 파일과 생성 증적은 Git에 포함하지 않는다. Phase 6 권한 13개는 SQL이 역할에 자동 부여하지 않으므로 역할 관리 화면에서 업무분장에 맞게 명시적으로 부여한다.
+
+### Phase 6 검증 결과
+
+- PostgreSQL 패치: `20260824_005`, 기존 완료 응답 증적 큐 보강 `20260824_006`
+- 검증 SQL: `009`, `010` (`seal_test`, `seal_dev` 통과)
+- 전체 자동화 테스트: 222건, 실패·오류·건너뜀 0건
+- 실제 PostgreSQL 통합 흐름: 증적 큐·권리요청 암호화/상태·기산일 버전·보존 보류·이중 통제 파기·범위 제한 통계
+- 실행 산출물과 포트: `target/seal.war`, 9090
+- 미검증/제외: Rocky Linux, 백업·복구와 백업본 파기, 운영 HTTPS·도메인·Nginx, 실제 SMTP 발송

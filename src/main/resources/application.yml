@@ -67,6 +67,10 @@ management:
       show-details: never
 
 seal:
+  evidence:
+    root: ${SEAL_EVIDENCE_ROOT:target/seal-evidence}
+    hmac-key-file: ${SEAL_EVIDENCE_HMAC_KEY_FILE:}
+    worker-enabled: ${SEAL_EVIDENCE_WORKER_ENABLED:false}
   recipient-import:
     max-rows: ${SEAL_IMPORT_MAX_ROWS:1000}
     max-bytes: ${SEAL_IMPORT_MAX_BYTES:5242880}

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.arte.seal.statistics.persistence.StatisticsMapper">
+    <select id="query" resultType="kr.or.arte.seal.statistics.persistence.MetricCount">
+        WITH RECURSIVE visible_scope(organization_unit_id, include_descendants) AS (
+            SELECT scope_target_id, include_descendants
+              FROM seal.user_scope
+             WHERE admin_user_id=#{actorId} AND scope_type='ORGANIZATION' AND active=TRUE
+            UNION
+            SELECT c.organization_unit_id, TRUE
+              FROM seal.organization_unit c
+              JOIN visible_scope p ON c.parent_id=p.organization_unit_id
+             WHERE p.include_descendants=TRUE
+        ), metrics AS (
+            SELECT 'REQUEST' category, r.request_status status, count(*) count
+              FROM seal.consent_request r JOIN visible_scope s USING(organization_unit_id)
+             WHERE r.created_at&gt;=#{from} AND r.created_at&lt;(#{to}::date+1)
+             GROUP BY r.request_status
+            UNION ALL
+            SELECT 'RESPONSE', res.response_status, count(*)
+              FROM seal.consent_response res
+              JOIN seal.consent_request r USING(consent_request_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE res.submitted_at&gt;=#{from} AND res.submitted_at&lt;(#{to}::date+1)
+             GROUP BY res.response_status
+            UNION ALL
+            SELECT 'RESPONSE', 'WITHDRAWN', count(*)
+              FROM seal.consent_withdrawal w
+              JOIN seal.consent_response res USING(consent_response_id)
+              JOIN seal.consent_request r USING(consent_request_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE w.withdrawn_at&gt;=#{from} AND w.withdrawn_at&lt;(#{to}::date+1)
+            UNION ALL
+            SELECT 'MAIL', m.mail_status, count(*)
+              FROM seal.mail_outbox m
+              JOIN seal.consent_request r USING(consent_request_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE m.created_at&gt;=#{from} AND m.created_at&lt;(#{to}::date+1)
+             GROUP BY m.mail_status
+            UNION ALL
+            SELECT 'EVIDENCE', e.generation_status, count(*)
+              FROM seal.evidence_package e JOIN visible_scope s USING(organization_unit_id)
+             WHERE e.queued_at&gt;=#{from} AND e.queued_at&lt;(#{to}::date+1)
+             GROUP BY e.generation_status
+            UNION ALL
+            SELECT 'EVIDENCE', 'VERIFY_' || v.verification_result, count(*)
+              FROM seal.evidence_verification v
+              JOIN seal.evidence_package e USING(evidence_package_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE v.verification_result&lt;&gt;'VALID'
+               AND v.verified_at&gt;=#{from} AND v.verified_at&lt;(#{to}::date+1)
+             GROUP BY v.verification_result
+            UNION ALL
+            SELECT 'RIGHTS', rr.rights_type || ':' || rr.request_status, count(*)
+              FROM seal.rights_request rr JOIN visible_scope s USING(organization_unit_id)
+             WHERE rr.created_at&gt;=#{from} AND rr.created_at&lt;(#{to}::date+1)
+             GROUP BY rr.rights_type, rr.request_status
+            UNION ALL
+            SELECT 'RIGHTS', 'OVERDUE', count(*)
+              FROM seal.rights_request rr JOIN visible_scope s USING(organization_unit_id)
+             WHERE rr.due_date&lt;CURRENT_DATE
+               AND rr.request_status NOT IN ('COMPLETED','CANCELLED')
+               AND rr.created_at&gt;=#{from} AND rr.created_at&lt;(#{to}::date+1)
+            UNION ALL
+            SELECT 'RETENTION', j.job_status, count(*)
+              FROM seal.retention_job j
+              JOIN seal.consent_request r USING(consent_request_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE j.requested_at&gt;=#{from} AND j.requested_at&lt;(#{to}::date+1)
+             GROUP BY j.job_status
+            UNION ALL
+            SELECT 'RETENTION', 'LEGAL_HOLD_ACTIVE', count(*)
+              FROM seal.legal_hold h
+              JOIN seal.consent_request r USING(consent_request_id)
+              JOIN visible_scope s USING(organization_unit_id)
+             WHERE h.active AND (h.expires_on IS NULL OR h.expires_on&gt;=CURRENT_DATE)
+               AND h.held_at&gt;=#{from} AND h.held_at&lt;(#{to}::date+1)
+        )
+        SELECT category, status, count
+          FROM metrics
+         WHERE count&gt;0
+         ORDER BY category, status
+    </select>
+</mapper>

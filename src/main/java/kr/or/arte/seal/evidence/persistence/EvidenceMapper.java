@@ -1,0 +1,28 @@
+package kr.or.arte.seal.evidence.persistence;
+
+import kr.or.arte.seal.evidence.application.*;
+import kr.or.arte.seal.evidence.domain.EvidenceGenerationStatus;
+import org.apache.ibatis.annotations.*;
+import java.time.Instant;
+import java.util.*;
+
+@Mapper
+public interface EvidenceMapper {
+    void enqueue(@Param("packageId") UUID packageId,@Param("responseId") UUID responseId,
+                 @Param("requestId") UUID requestId,@Param("now") Instant now);
+    List<EvidenceWorkRow> claimDue(@Param("now") Instant now,@Param("limit") int limit,
+                                   @Param("leaseExpiredAt") Instant leaseExpiredAt);
+    List<String> decisions(@Param("responseId") UUID responseId);
+    List<String> events(@Param("requestId") UUID requestId);
+    void finalizePackage(@Param("packageId") UUID packageId,@Param("generated") GeneratedEvidence generated,
+                         @Param("now") Instant now);
+    void insertFile(@Param("packageId") UUID packageId,@Param("file") EvidenceFileMetadata file,
+                    @Param("now") Instant now);
+    void fail(@Param("packageId") UUID packageId,@Param("code") String code,@Param("now") Instant now);
+    List<EvidencePackageSummary> search(@Param("actorId") UUID actorId,@Param("status") EvidenceGenerationStatus status);
+    Optional<EvidencePackageDetail> findScoped(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId);
+    List<EvidenceFileMetadata> files(@Param("packageId") UUID packageId);
+    int requeue(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId,@Param("now") Instant now);
+    void verification(@Param("id") UUID id,@Param("packageId") UUID packageId,@Param("actorId") UUID actorId,
+                      @Param("result") EvidenceVerificationResult result,@Param("now") Instant now);
+}

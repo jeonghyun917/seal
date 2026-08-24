@@ -1,0 +1,1 @@
+package kr.or.arte.seal.statistics.persistence;import org.apache.ibatis.annotations.*;import java.time.LocalDate;import java.util.*;@Mapper public interface StatisticsMapper {List<MetricCount> query(@Param("actorId")UUID actor,@Param("from")LocalDate from,@Param("to")LocalDate to);}

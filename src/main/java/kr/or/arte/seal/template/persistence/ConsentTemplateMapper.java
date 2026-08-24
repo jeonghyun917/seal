@@ -28,4 +28,28 @@ public interface ConsentTemplateMapper {
     int clearDraftItems(@Param("versionId") UUID versionId, @Param("actorId") UUID actorId);
     int updateDraft(@Param("version") ConsentTemplateVersion version,
                     @Param("actorId") UUID actorId, @Param("now") Instant now);
+    int updateTemplateName(@Param("templateId") UUID templateId,
+                           @Param("templateName") String templateName,
+                           @Param("versionNo") long versionNo,
+                           @Param("actorId") UUID actorId, @Param("now") Instant now);
+    int updateTransition(@Param("version") ConsentTemplateVersion version,
+                         @Param("actorId") UUID actorId, @Param("now") Instant now);
+    int insertReview(@Param("reviewId") UUID reviewId, @Param("versionId") UUID versionId,
+                     @Param("action") String action, @Param("actorId") UUID actorId,
+                     @Param("comment") String comment, @Param("now") Instant now);
+    List<UUID> findPublishedVersionIdsForUpdate(@Param("templateId") UUID templateId);
+    int retirePublishedVersions(@Param("templateId") UUID templateId,
+                                @Param("newVersionId") UUID newVersionId,
+                                @Param("actorId") UUID actorId, @Param("now") Instant now);
+    int publishVersion(@Param("version") ConsentTemplateVersion version,
+                       @Param("actorId") UUID actorId, @Param("now") Instant now);
+    int updateCurrentPublishedVersion(@Param("templateId") UUID templateId,
+                                      @Param("versionId") UUID versionId,
+                                      @Param("actorId") UUID actorId, @Param("now") Instant now);
+    boolean isLatestPublishedOrRetired(@Param("templateId") UUID templateId,
+                                       @Param("sourceVersionId") UUID sourceVersionId);
+    int nextVersionNumber(@Param("templateId") UUID templateId);
+    int updateStatus(@Param("templateId") UUID templateId, @Param("status") String status,
+                     @Param("versionNo") long versionNo, @Param("actorId") UUID actorId,
+                     @Param("now") Instant now);
 }

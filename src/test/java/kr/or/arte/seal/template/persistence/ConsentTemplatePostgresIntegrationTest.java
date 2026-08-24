@@ -2,6 +2,7 @@ package kr.or.arte.seal.template.persistence;
 
 import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityQuery;
 import kr.or.arte.seal.template.application.ConsentTemplateDetail;
+import kr.or.arte.seal.template.application.ConsentTemplateManagement;
 import kr.or.arte.seal.template.application.ConsentTemplateRepository;
 import kr.or.arte.seal.template.domain.ConsentItemDefinition;
 import kr.or.arte.seal.template.domain.ConsentItemType;
@@ -29,6 +30,7 @@ class ConsentTemplatePostgresIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-08-24T00:00:00Z");
 
     @Autowired ConsentTemplateRepository repository;
+    @Autowired ConsentTemplateManagement management;
     @Autowired ApprovedProcessingActivityQuery approvedActivityQuery;
     @Autowired JdbcTemplate jdbcTemplate;
 
@@ -108,6 +110,41 @@ class ConsentTemplatePostgresIntegrationTest {
                 .isInstanceOf(DataAccessException.class);
     }
 
+    @Test
+    void reviewsApprovesAndPublishesAgainstPostgresql() {
+        Fixture fixture = fixture();
+        UUID templateId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        ConsentTemplateVersion draft = ConsentTemplateVersion.draft(
+                versionId, templateId, fixture.activityId(), fixture.activityVersionId(),
+                1, "교육 프로그램 개인정보 동의서",
+                "<p>교육 프로그램 운영을 위한 개인정보 처리 안내입니다.</p>",
+                List.of(item(1, "NAME", "성명 수집 이용 동의", fixture.dataItemIds().get(0))),
+                fixture.authorId());
+        repository.insertTemplate(new ConsentTemplateDetail(
+                templateId, "TPL-" + compact(templateId), "교육 프로그램 동의서",
+                fixture.activityId(), "교육 프로그램 운영", "ACTIVE", null, 0, draft),
+                fixture.authorId(), NOW);
+
+        management.requestReview(templateId, versionId, fixture.authorId());
+        management.approve(templateId, versionId, fixture.reviewerId());
+        management.publish(templateId, versionId, fixture.reviewerId());
+
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT workflow_status = 'PUBLISHED' AND content_hash ~ '^[0-9a-f]{64}$'
+                  FROM seal.consent_template_version
+                 WHERE consent_template_version_id = ?
+                """, Boolean.class, versionId)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT current_published_version_id = ?
+                  FROM seal.consent_template WHERE consent_template_id = ?
+                """, Boolean.class, versionId, templateId)).isTrue();
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM seal.template_review
+                 WHERE consent_template_version_id = ?
+                """, Integer.class, versionId)).isEqualTo(3);
+    }
+
     private Fixture fixture() {
         UUID authorId = UUID.randomUUID();
         UUID reviewerId = UUID.randomUUID();
@@ -119,6 +156,11 @@ class ConsentTemplatePostgresIntegrationTest {
                     scope_target_id, include_descendants, assigned_by, active)
                 VALUES (?, ?, 'ORGANIZATION', ?, TRUE, ?, TRUE)
                 """, UUID.randomUUID(), authorId, organizationId, authorId);
+        jdbcTemplate.update("""
+                INSERT INTO seal.user_scope (user_scope_id, admin_user_id, scope_type,
+                    scope_target_id, include_descendants, assigned_by, active)
+                VALUES (?, ?, 'ORGANIZATION', ?, TRUE, ?, TRUE)
+                """, UUID.randomUUID(), reviewerId, organizationId, authorId);
 
         UUID retentionPolicyId = UUID.randomUUID();
         UUID retentionVersionId = UUID.randomUUID();
@@ -176,7 +218,7 @@ class ConsentTemplatePostgresIntegrationTest {
                 VALUES (?, ?, 1, '성명', '참여자 식별', TRUE, 'GENERAL'),
                        (?, ?, 2, '이메일', '교육 일정 안내', TRUE, 'GENERAL')
                 """, nameItemId, activityVersionId, emailItemId, activityVersionId);
-        return new Fixture(authorId, activityId, activityVersionId,
+        return new Fixture(authorId, reviewerId, activityId, activityVersionId,
                 List.of(nameItemId, emailItemId));
     }
 
@@ -200,7 +242,7 @@ class ConsentTemplatePostgresIntegrationTest {
         return id.toString().replace("-", "").substring(0, 12).toUpperCase();
     }
 
-    private record Fixture(UUID authorId, UUID activityId, UUID activityVersionId,
+    private record Fixture(UUID authorId, UUID reviewerId, UUID activityId, UUID activityVersionId,
                            List<UUID> dataItemIds) {
     }
 }

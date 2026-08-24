@@ -109,4 +109,103 @@
            AND workflow_status = 'DRAFT'
            AND version_no = #{version.versionNo}
     </update>
+
+    <update id="updateTemplateName">
+        UPDATE seal.consent_template
+           SET template_name = #{templateName}, updated_by = #{actorId}, updated_at = #{now},
+               version_no = version_no + 1
+         WHERE consent_template_id = #{templateId}
+           AND version_no = #{versionNo}
+    </update>
+
+    <update id="updateTransition">
+        UPDATE seal.consent_template_version
+           SET workflow_status = #{version.workflowStatus},
+               review_requested_by = #{version.reviewRequestedBy, jdbcType=OTHER},
+               review_requested_at = CASE WHEN #{version.workflowStatus} = 'REVIEW_REQUESTED'
+                    THEN CAST(#{now} AS TIMESTAMPTZ)
+                    WHEN #{version.workflowStatus} = 'DRAFT' THEN NULL
+                    ELSE review_requested_at END,
+               approved_by = #{version.approvedBy, jdbcType=OTHER},
+               approved_at = CASE WHEN #{version.workflowStatus} = 'APPROVED'
+                    THEN CAST(#{now} AS TIMESTAMPTZ) ELSE NULL END,
+               rejection_comment = #{version.rejectionComment, jdbcType=VARCHAR},
+               updated_by = #{actorId}, updated_at = #{now}, version_no = version_no + 1
+         WHERE consent_template_version_id = #{version.consentTemplateVersionId}
+           AND version_no = #{version.versionNo}
+    </update>
+
+    <insert id="insertReview">
+        INSERT INTO seal.template_review (template_review_id, consent_template_version_id,
+            review_action, actor_id, comment, created_at)
+        VALUES (#{reviewId}, #{versionId}, #{action}, #{actorId},
+            #{comment, jdbcType=VARCHAR}, #{now})
+    </insert>
+
+    <select id="findPublishedVersionIdsForUpdate" resultType="java.util.UUID">
+        SELECT consent_template_version_id
+          FROM seal.consent_template_version
+         WHERE consent_template_id = #{templateId} AND workflow_status = 'PUBLISHED'
+         FOR UPDATE
+    </select>
+
+    <update id="retirePublishedVersions">
+        UPDATE seal.consent_template_version
+           SET workflow_status = 'RETIRED', updated_by = #{actorId}, updated_at = #{now},
+               version_no = version_no + 1
+         WHERE consent_template_id = #{templateId}
+           AND consent_template_version_id &lt;&gt; #{newVersionId}
+           AND workflow_status = 'PUBLISHED'
+    </update>
+
+    <update id="publishVersion">
+        UPDATE seal.consent_template_version
+           SET workflow_status = 'PUBLISHED', published_by = #{version.publishedBy},
+               published_at = #{now}, content_hash = #{version.contentHash},
+               rejection_comment = NULL, updated_by = #{actorId}, updated_at = #{now},
+               version_no = version_no + 1
+         WHERE consent_template_version_id = #{version.consentTemplateVersionId}
+           AND workflow_status = 'APPROVED'
+           AND version_no = #{version.versionNo}
+    </update>
+
+    <update id="updateCurrentPublishedVersion">
+        UPDATE seal.consent_template
+           SET current_published_version_id = #{versionId}, updated_by = #{actorId},
+               updated_at = #{now}, version_no = version_no + 1
+         WHERE consent_template_id = #{templateId}
+    </update>
+
+    <select id="isLatestPublishedOrRetired" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM seal.consent_template_version candidate
+             WHERE candidate.consent_template_id = #{templateId}
+               AND candidate.consent_template_version_id = #{sourceVersionId}
+               AND candidate.workflow_status IN ('PUBLISHED', 'RETIRED')
+               AND candidate.version_number = (
+                   SELECT max(latest.version_number)
+                     FROM seal.consent_template_version latest
+                    WHERE latest.consent_template_id = #{templateId}
+                      AND latest.workflow_status IN ('PUBLISHED', 'RETIRED')
+               )
+        )
+    </select>
+
+    <select id="nextVersionNumber" resultType="int">
+        SELECT COALESCE(max(version_number), 0) + 1
+          FROM seal.consent_template_version
+         WHERE consent_template_id = #{templateId}
+    </select>
+
+    <update id="updateStatus">
+        <include refid="visibleScope"/>
+        UPDATE seal.consent_template
+           SET template_status = #{status}, updated_by = #{actorId}, updated_at = #{now},
+               version_no = version_no + 1
+          FROM seal.processing_activity activity, visible_scope scope
+         WHERE consent_template.consent_template_id = #{templateId}
+           AND consent_template.version_no = #{versionNo}
+           AND activity.processing_activity_id = consent_template.processing_activity_id
+           AND scope.organization_unit_id = activity.owner_organization_unit_id
+    </update>
 </mapper>

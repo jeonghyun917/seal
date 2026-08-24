@@ -64,6 +64,67 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
         insertItems(draft);
     }
 
+    @Override
+    @Transactional
+    public void updateTemplateName(UUID templateId, String templateName, long versionNo,
+                                   UUID actorId, Instant now) {
+        requireOne(mapper.updateTemplateName(templateId, templateName, versionNo, actorId, now),
+                "다른 사용자가 템플릿 기본정보를 변경했습니다.");
+    }
+
+    @Override
+    @Transactional
+    public void updateTransition(ConsentTemplateVersion version, UUID actorId,
+                                 String reviewAction, String comment, Instant now) {
+        requireOne(mapper.updateTransition(version, actorId, now), "다른 사용자가 상태를 변경했습니다.");
+        requireOne(mapper.insertReview(UUID.randomUUID(), version.consentTemplateVersionId(),
+                reviewAction, actorId, comment, now), "검토 이력을 저장할 수 없습니다.");
+    }
+
+    @Override
+    @Transactional
+    public void publish(ConsentTemplateVersion version, UUID actorId, Instant now) {
+        List<UUID> retiredIds = mapper.findPublishedVersionIdsForUpdate(version.consentTemplateId());
+        mapper.retirePublishedVersions(version.consentTemplateId(),
+                version.consentTemplateVersionId(), actorId, now);
+        for (UUID retiredId : retiredIds) {
+            requireOne(mapper.insertReview(UUID.randomUUID(), retiredId, "RETIRED",
+                    actorId, null, now), "종료 이력을 저장할 수 없습니다.");
+        }
+        requireOne(mapper.publishVersion(version, actorId, now), "다른 사용자가 발행 상태를 변경했습니다.");
+        requireOne(mapper.updateCurrentPublishedVersion(version.consentTemplateId(),
+                version.consentTemplateVersionId(), actorId, now), "현재 발행 버전을 변경할 수 없습니다.");
+        requireOne(mapper.insertReview(UUID.randomUUID(), version.consentTemplateVersionId(),
+                "PUBLISHED", actorId, null, now), "발행 이력을 저장할 수 없습니다.");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isLatestPublishedOrRetired(UUID templateId, UUID sourceVersionId) {
+        return mapper.isLatestPublishedOrRetired(templateId, sourceVersionId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int nextVersionNumber(UUID templateId) {
+        return mapper.nextVersionNumber(templateId);
+    }
+
+    @Override
+    @Transactional
+    public void insertVersion(ConsentTemplateVersion draft, UUID actorId, Instant now) {
+        requireOne(mapper.insertVersion(draft, actorId, now), "새 초안을 생성할 수 없습니다.");
+        insertItems(draft);
+    }
+
+    @Override
+    @Transactional
+    public void updateStatus(UUID templateId, String status, long versionNo,
+                             UUID actorId, Instant now) {
+        requireOne(mapper.updateStatus(templateId, status, versionNo, actorId, now),
+                "다른 사용자가 템플릿 상태를 변경했습니다.");
+    }
+
     private void insertItems(ConsentTemplateVersion version) {
         mapper.insertItems(version.consentTemplateVersionId(), version.processingActivityVersionId(),
                 version.items());

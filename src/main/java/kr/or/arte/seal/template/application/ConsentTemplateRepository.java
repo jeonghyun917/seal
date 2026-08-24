@@ -9,4 +9,13 @@ public interface ConsentTemplateRepository {
     void insertTemplate(ConsentTemplateDetail draft, UUID actorId, Instant now);
     ConsentTemplateDetail requireVersionForUpdate(UUID actorId, UUID templateId, UUID versionId);
     void replaceDraft(ConsentTemplateVersion draft, UUID actorId, Instant now);
+    void updateTemplateName(UUID templateId, String templateName, long versionNo,
+                            UUID actorId, Instant now);
+    void updateTransition(ConsentTemplateVersion version, UUID actorId,
+                          String reviewAction, String comment, Instant now);
+    void publish(ConsentTemplateVersion version, UUID actorId, Instant now);
+    boolean isLatestPublishedOrRetired(UUID templateId, UUID sourceVersionId);
+    int nextVersionNumber(UUID templateId);
+    void insertVersion(ConsentTemplateVersion draft, UUID actorId, Instant now);
+    void updateStatus(UUID templateId, String status, long versionNo, UUID actorId, Instant now);
 }

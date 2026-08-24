@@ -74,6 +74,8 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `http://localhost:9090/system/status`
 - `http://localhost:9090/login`
 - `http://localhost:9090/admin`
+- `http://localhost:9090/admin/templates`
+- `http://localhost:9090/admin/templates/new`
 - `http://localhost:9090/actuator/health`
 
 로컬 프로필에서는 실제 메일 발송이 비활성화된다. SMTP 테스트는 Rocky Linux 공인 IP 등록 후 승인된 수신 주소로만 수행한다.
@@ -104,3 +106,26 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `seal_app`의 스키마 변경·DELETE 거부와 감사 테이블 UPDATE·DELETE 거부
 
 실제 SMTP 발송은 공인 IP 허용과 발신주소 확인이 완료될 때까지 로컬 검증 범위에서 제외한다.
+
+## Phase 2 동의서 템플릿
+
+승인된 처리업무 버전을 기준으로 구조화된 동의 항목을 작성하고 검토·승인·발행한다. 안내문 HTML은 허용 태그만 서버에서 정제하며, 이메일과 공개 웹 동의서는 발행 버전의 동일한 구조화 데이터를 사용한다.
+
+상태 흐름은 `DRAFT → REVIEW_REQUESTED → APPROVED → PUBLISHED → RETIRED`이며, 반려 시 `DRAFT`로 돌아간다. 작성자와 승인자는 달라야 하고 발행된 버전은 수정할 수 없다.
+
+| 권한 | 허용 기능 |
+|---|---|
+| `CONSENT_TEMPLATE_VIEW` | 목록·상세·미리보기 조회 |
+| `CONSENT_TEMPLATE_EDIT` | 초안 생성·수정·다음 버전 복제 |
+| `CONSENT_TEMPLATE_REVIEW` | 검토 요청 |
+| `CONSENT_TEMPLATE_APPROVE` | 승인·반려 |
+| `CONSENT_TEMPLATE_PUBLISH` | 발행·폐기 |
+
+역할 권한 외에도 현재 활성 계정의 조직·처리업무 범위를 서버와 DB에서 함께 검사한다. HTML 이메일 실발송, 외부 HTTPS와 일회용 링크 응답 수집은 후속 단계 범위다.
+
+### Phase 2 검증 결과
+
+- PostgreSQL 패치·검증: `20260824_001`, `20260824_002`, 검증 SQL `005`, `006`
+- 전체 자동화 테스트: 138건, 실패·오류·건너뜀 0건
+- 실행 산출물: `target/seal.war`
+- 로컬 실행 포트: 9090

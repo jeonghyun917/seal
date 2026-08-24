@@ -37,7 +37,7 @@
 - Consumes: 기존 `processing_activity`, `processing_activity_version`, `processing_data_item`, `admin_user`, `permission`, `admin_role`, `role_permission`, `db_change_history`
 - Produces: `consent_template`, `consent_template_version`, `consent_item_definition`, `consent_item_data_selection`, `template_review`와 `CONSENT_TEMPLATE_*` 권한 5개
 
-- [ ] **Step 1: 실제 PostgreSQL 제약을 요구하는 실패 통합 테스트 작성**
+- [x] **Step 1: 실제 PostgreSQL 제약을 요구하는 실패 통합 테스트 작성**
 
 ```java
 @Test
@@ -60,12 +60,12 @@ void sealAppCannotDeleteTemplateOrUpdateReviewHistory() {
 }
 ```
 
-- [ ] **Step 2: 통합 테스트 RED 확인**
+- [x] **Step 2: 통합 테스트 RED 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateSchemaPostgresIntegrationTest test`  
 Expected: FAIL because the five template tables do not exist.
 
-- [ ] **Step 3: 수동 DB 패치 작성**
+- [x] **Step 3: 수동 DB 패치 작성**
 
 패치에는 다음 제약을 정확히 포함한다.
 
@@ -217,16 +217,16 @@ ALTER TABLE consent_template
 
 새 권한 UUID는 기존 `00000000-0000-0000-0002-*` 대역에서 18~22를 사용해 `CONSENT_TEMPLATE_VIEW`, `CONSENT_TEMPLATE_EDIT`, `CONSENT_TEMPLATE_REVIEW`, `CONSENT_TEMPLATE_APPROVE`, `CONSENT_TEMPLATE_PUBLISH`를 INSERT하고 `SYSTEM_ADMIN`에만 기본 배정한다. 본문 네 테이블에는 `seal_app` SELECT·INSERT·UPDATE, `template_review`에는 SELECT·INSERT만 부여하며 모든 테이블의 DELETE·TRUNCATE와 스키마 DDL은 거부한다.
 
-- [ ] **Step 4: 검증 SQL 작성**
+- [x] **Step 4: 검증 SQL 작성**
 
 `005_consent_template_verify.sql`은 테이블·CHECK·FK·UNIQUE 존재, 권한 5개, `seal_app`의 DML 최소 권한, `template_review` UPDATE/DELETE 거부와 `db_change_history` 체크섬을 `DO $$ ... RAISE EXCEPTION` 방식으로 검증한다.
 
-- [ ] **Step 5: `seal_test`에 패치 적용 후 GREEN 확인**
+- [x] **Step 5: `seal_test`에 패치 적용 후 GREEN 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateSchemaPostgresIntegrationTest test`  
 Expected: PASS, including cross-activity FK and least-privilege assertions.
 
-- [ ] **Step 6: Task 1 커밋**
+- [x] **Step 6: Task 1 커밋**
 
 ```powershell
 git add database/03_patch/20260824_001_create_consent_template_tables.sql database/04_verify/005_consent_template_verify.sql database/03_patch/README.md src/test/java/kr/or/arte/seal/template/persistence/ConsentTemplateSchemaPostgresIntegrationTest.java
@@ -252,7 +252,7 @@ git commit -m "feat: 동의서 템플릿 데이터 모델 추가"
 - Produces: `ConsentTemplateVersion.requestReview`, `approve`, `reject`, `publish`, `retire`; `TemplateHtmlSanitizer.sanitize`; `TemplateContentHasher.sha256`
 - Consumes: 처리업무 항목 UUID·명칭과 서버 파생 보유기간 문구
 
-- [ ] **Step 1: 상태와 항목 규칙 실패 테스트 작성**
+- [x] **Step 1: 상태와 항목 규칙 실패 테스트 작성**
 
 ```java
 @Test
@@ -279,12 +279,12 @@ void publishedVersionCannotBeEdited() {
 }
 ```
 
-- [ ] **Step 2: 도메인 RED 확인**
+- [x] **Step 2: 도메인 RED 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateVersionTest test`  
 Expected: compilation FAIL because domain types do not exist.
 
-- [ ] **Step 3: 최소 도메인 구현**
+- [x] **Step 3: 최소 도메인 구현**
 
 ```java
 public record ConsentItemDefinition(
@@ -309,12 +309,12 @@ public record ConsentItemDefinition(
 
 버전 record는 상태별 필수 필드와 길이를 생성자에서 검증하고 각 전이 메서드는 새 불변 record를 반환한다.
 
-- [ ] **Step 4: 도메인 GREEN 확인**
+- [x] **Step 4: 도메인 GREEN 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateVersionTest test`  
 Expected: PASS.
 
-- [ ] **Step 5: 정제·해시 실패 테스트 작성**
+- [x] **Step 5: 정제·해시 실패 테스트 작성**
 
 ```java
 @Test
@@ -330,16 +330,16 @@ void hashIsStableAcrossMapInsertionOrderAndCrLf() {
 }
 ```
 
-- [ ] **Step 6: 정제·해시 RED 확인**
+- [x] **Step 6: 정제·해시 RED 확인**
 
 Run: `./mvnw.cmd -Dtest=TemplateHtmlSanitizerTest,TemplateContentHasherTest test`  
 Expected: compilation FAIL because the services do not exist.
 
-- [ ] **Step 7: OWASP 정제와 canonical hash 구현**
+- [x] **Step 7: OWASP 정제와 canonical hash 구현**
 
 `pom.xml`에 Maven Central에서 확인한 `com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20260313.1`을 property로 고정한다. `PolicyFactory`는 `p`, `br`, `ul`, `ol`, `li`, `strong`, `em`, `h3`, `h4`만 허용한다. 해시는 Jackson 정렬 옵션, LF 줄바꿈과 UTF-8을 사용한다.
 
-- [ ] **Step 8: 정제·해시 GREEN 및 Task 2 커밋**
+- [x] **Step 8: 정제·해시 GREEN 및 Task 2 커밋**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateVersionTest,TemplateHtmlSanitizerTest,TemplateContentHasherTest test`  
 Expected: PASS.
@@ -369,7 +369,7 @@ git commit -m "feat: 동의서 템플릿 도메인 규칙 구현"
 - Produces: `ApprovedProcessingActivityQuery.findApprovedForTemplate(UUID actorId, UUID versionId)` and `ConsentTemplateRepository` lifecycle persistence methods
 - Consumes: Task 1 tables and Task 2 domain records
 
-- [ ] **Step 1: 저장소 실패 통합 테스트 작성**
+- [x] **Step 1: 저장소 실패 통합 테스트 작성**
 
 ```java
 @Test
@@ -383,12 +383,12 @@ void savesAndReloadsDraftWithOrderedItems() {
 }
 ```
 
-- [ ] **Step 2: persistence RED 확인**
+- [x] **Step 2: persistence RED 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplatePostgresIntegrationTest test`  
 Expected: compilation FAIL because repository types do not exist.
 
-- [ ] **Step 3: 공개 정책 조회 인터페이스 구현**
+- [x] **Step 3: 공개 정책 조회 인터페이스 구현**
 
 ```java
 public interface ApprovedProcessingActivityQuery {
@@ -404,7 +404,7 @@ public record ApprovedProcessingActivityReference(
 
 조회 구현은 처리업무 `ACTIVE`, 버전 `APPROVED`, 보유정책 버전 `APPROVED`, 법적 근거 `CONSENT`를 모두 SQL에서 제한하고 없으면 빈 결과가 아니라 명시적 업무 예외를 반환한다.
 
-- [ ] **Step 4: 템플릿 Mapper와 저장소 구현**
+- [x] **Step 4: 템플릿 Mapper와 저장소 구현**
 
 Mapper는 논리 템플릿·버전·항목·선택 항목을 각각 명시적 INSERT/UPDATE로 처리한다. 발행 메서드는 `SELECT ... FOR UPDATE`, 이전 발행 버전 retire, 새 버전 publish, current pointer 갱신 행 수를 모두 검사한다. 동적 SQL 식별자 조립은 사용하지 않는다.
 
@@ -422,7 +422,7 @@ public interface ConsentTemplateRepository {
 }
 ```
 
-- [ ] **Step 5: persistence GREEN 확인 및 Task 3 커밋**
+- [x] **Step 5: persistence GREEN 확인 및 Task 3 커밋**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplatePostgresIntegrationTest test`  
 Expected: PASS with real PostgreSQL.
@@ -478,7 +478,7 @@ public interface ConsentTemplateManagement {
 }
 ```
 
-- [ ] **Step 1: 애플리케이션 실패 테스트 작성**
+- [x] **Step 1: 애플리케이션 실패 테스트 작성**
 
 ```java
 @Test
@@ -501,12 +501,12 @@ void reviewRequestRejectsDataItemOutsideApprovedActivity() {
 }
 ```
 
-- [ ] **Step 2: service RED 확인**
+- [x] **Step 2: service RED 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateManagementServiceTest test`  
 Expected: compilation FAIL because service and commands do not exist.
 
-- [ ] **Step 3: 최소 서비스 구현**
+- [x] **Step 3: 최소 서비스 구현**
 
 ```java
 @Transactional
@@ -523,12 +523,12 @@ public void publish(UUID templateId, UUID versionId, UUID actorId) {
 
 생성·수정 때 HTML을 정제하고 `COLLECTION_USE`/`OPTIONAL` 보유기간은 policy 참조에서 덮어쓴다. 모든 상태 전이는 도메인 메서드를 먼저 거치고 저장 행 수가 1이 아니면 409 예외로 변환한다.
 
-- [ ] **Step 4: service GREEN 확인**
+- [x] **Step 4: service GREEN 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateManagementServiceTest test`  
 Expected: PASS for normal, invalid state, self-approval, stale policy and duplicate publication paths.
 
-- [ ] **Step 5: Task 4 커밋**
+- [x] **Step 5: Task 4 커밋**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/template/application src/test/java/kr/or/arte/seal/template/application
@@ -555,7 +555,7 @@ git commit -m "feat: 동의서 템플릿 승인 워크플로우 구현"
 - Produces: 설계서의 `/admin/templates/**` GET/POST URL
 - Consumes: Task 4 management/query services and Spring Security authorities
 
-- [ ] **Step 1: 권한·CSRF·폼 실패 MVC 테스트 작성**
+- [x] **Step 1: 권한·CSRF·폼 실패 MVC 테스트 작성**
 
 ```java
 @Test
@@ -580,12 +580,12 @@ void outOfScopeDetailIsNotFound() throws Exception {
 }
 ```
 
-- [ ] **Step 2: MVC RED 확인**
+- [x] **Step 2: MVC RED 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateControllerTest test`  
 Expected: compilation FAIL because controller/form types do not exist.
 
-- [ ] **Step 3: 컨트롤러와 폼 구현**
+- [x] **Step 3: 컨트롤러와 폼 구현**
 
 권한 매핑은 다음과 같이 고정한다.
 
@@ -599,16 +599,16 @@ Expected: compilation FAIL because controller/form types do not exist.
 
 `ConsentTemplateQueryService`는 `search(UUID actorId, String keyword, String status)`, `requireScoped(UUID templateId, UUID actorId)`, `requireVersionScoped(UUID templateId, UUID versionId, UUID actorId)`를 제공한다. Form은 항목 목록에 `@Valid`를 적용하고 빈 목록, 중복 코드와 순서는 service에서 다시 검증한다. 409 예외는 오류 JSP가 아니라 상세 화면으로 되돌려 최신 상태 메시지를 표시한다.
 
-- [ ] **Step 4: JSP·네이티브 JS 구현**
+- [x] **Step 4: JSP·네이티브 JS 구현**
 
 JSP는 `<c:out>`과 Spring form 태그를 기본으로 사용한다. 정제된 `introduction_html`은 미리보기에서만 신뢰된 서버 결과로 출력한다. `template-form.js`는 항목 행 복제와 이름 인덱스 재부여만 담당하고 승인·검증 로직은 포함하지 않는다. 사용자 수정 중인 공통 `app.css`는 수정하지 않고 새 `template.css`만 추가한다.
 
-- [ ] **Step 5: MVC GREEN 확인**
+- [x] **Step 5: MVC GREEN 확인**
 
 Run: `./mvnw.cmd -Dtest=ConsentTemplateControllerTest test`  
 Expected: PASS for 200/302/403/404/CSRF/form-error cases.
 
-- [ ] **Step 6: Task 5 커밋**
+- [x] **Step 6: Task 5 커밋**
 
 ```powershell
 git add src/main/java/kr/or/arte/seal/template/web src/main/webapp/WEB-INF/jsp/admin/templates src/main/webapp/resources/css/template.css src/main/webapp/resources/js/template-form.js src/main/webapp/WEB-INF/jsp/admin/home.jsp src/test/java/kr/or/arte/seal/template/web
@@ -631,7 +631,7 @@ git commit -m "feat: 동의서 템플릿 관리자 화면 구현"
 - Produces: 이메일·공개 웹이 다음 단계에서 재사용할 `PublishedTemplateView`와 JSP fragment
 - Consumes: 발행/폐기 버전의 구조화 데이터
 
-- [ ] **Step 1: 복제·렌더링 실패 테스트 작성**
+- [x] **Step 1: 복제·렌더링 실패 테스트 작성**
 
 ```java
 @Test
@@ -650,16 +650,16 @@ void previewUsesStructuredItemOrder() {
 }
 ```
 
-- [ ] **Step 2: RED 확인**
+- [x] **Step 2: RED 확인**
 
 Run: `./mvnw.cmd -Dtest=TemplatePreviewRendererTest,ConsentTemplateVersionCopyTest test`  
 Expected: compilation FAIL because renderer/view/copy operation do not exist.
 
-- [ ] **Step 3: 최소 복제·공유 view 구현**
+- [x] **Step 3: 최소 복제·공유 view 구현**
 
 복제는 source의 표시 내용과 선택 항목만 새 UUID로 복사한다. 승인·발행·반려 필드와 해시는 NULL로 초기화한다. `PublishedTemplateView`는 개인정보나 관리자 식별자를 포함하지 않고 제목, 안내문, 처리 목적, 보유기간과 정렬된 결정 항목만 노출한다.
 
-- [ ] **Step 4: GREEN 확인 및 Task 6 커밋**
+- [x] **Step 4: GREEN 확인 및 Task 6 커밋**
 
 Run: `./mvnw.cmd -Dtest=TemplatePreviewRendererTest,ConsentTemplateVersionCopyTest test`  
 Expected: PASS.
@@ -680,21 +680,21 @@ git commit -m "feat: 발행 템플릿 단일 원본 미리보기 구현"
 - Consumes: Task 1~6 전체 산출물
 - Produces: 적용·검증 명령과 Phase 2 완료 증거
 
-- [ ] **Step 1: SQL 체크섬과 검증 실행**
+- [x] **Step 1: SQL 체크섬과 검증 실행**
 
 패치 파일 SHA-256을 계산해 `psql` 변수로 넘기고 `seal_test`에 적용한다. 검증 SQL은 모든 assertion을 통과해야 하며 재적용은 명시적 중복 오류로 중단돼야 한다.
 
-- [ ] **Step 2: 전체 테스트 실행**
+- [x] **Step 2: 전체 테스트 실행**
 
 Run: `./mvnw.cmd test`  
 Expected: all tests PASS, 0 failures, 0 errors, 0 skipped.
 
-- [ ] **Step 3: 실행형 WAR 패키징**
+- [x] **Step 3: 실행형 WAR 패키징**
 
 Run: `./mvnw.cmd clean package`  
 Expected: exit 0 and `target/seal.war` exists.
 
-- [ ] **Step 4: 9090 대표 화면 스모크**
+- [x] **Step 4: 9090 대표 화면 스모크**
 
 애플리케이션을 local profile로 실행하고 다음을 확인한다.
 
@@ -709,17 +709,27 @@ GET  same out-of-scope template                                  -> 404
 
 대표 데스크톱과 360px 모바일 폭에서 목록, 폼, 상세, 미리보기의 겹침·키보드 포커스·레이블을 확인한다.
 
-- [ ] **Step 5: 문서와 계획 체크박스 갱신**
+- [x] **Step 5: 문서와 계획 체크박스 갱신**
 
 README에 템플릿 URL, 권한과 SQL 적용 순서를 추가한다. 본 계획의 실제 완료 단계만 `[x]`로 바꾸고 외부 SMTP·HTTPS는 Phase 2 검증 대상이 아님을 기록한다.
 
-- [ ] **Step 6: 최종 커밋**
+- [x] **Step 6: 최종 커밋**
 
 ```powershell
 git add README.md database/README.md docs/superpowers/plans/2026-08-24-phase2-consent-template-implementation.md
 git commit -m "docs: 2단계 템플릿 검증 절차 기록"
 ```
 
-- [ ] **Step 7: 원격 푸시 전 최종 대조**
+- [x] **Step 7: 원격 푸시 전 최종 대조**
 
 `git status --short`, `git diff --check`, `git log --oneline origin/main..HEAD`를 확인한다. 사용자 `app.css`, PPT·DOCX와 `tools/`는 포함하지 않는다. 검증된 `feature/phase2-template`만 Private GitHub 저장소에 푸시한다.
+
+### 완료 증거 (2026-08-24)
+
+- `seal_test`와 `seal_dev`에 `20260824_001`, `20260824_002`를 체크섬과 함께 적용했고 검증 SQL `005`, `006`이 통과했다.
+- PostgreSQL 실제 저장소·상태 전이 검증을 포함한 전체 138개 테스트가 실패·오류·건너뜀 없이 통과했다.
+- 최신 소스로 `target/seal.war`를 생성했고 9090에서 홈·상태·로그인·health 응답과 관리자 URL의 로그인 리다이렉트를 확인했다.
+- 인증 후 템플릿 목록·폼·상세·미리보기, CSRF, 권한 거부, 상태 전이는 MVC 및 실제 PostgreSQL 통합 테스트로 검증했다.
+- 브라우저에서 로그인 화면의 1280px·360px 가로 넘침, 레이블 노출, 콘솔 오류를 확인했다.
+- 로컬 `seal_dev`에는 승인된 처리업무와 템플릿 샘플 데이터를 임의로 넣지 않았다. 실제 화면 데이터 작성은 정책 관리에서 처리업무를 승인한 뒤 시작한다.
+- SMTP 실발송, 운영 도메인·HTTPS, 일회용 외부 링크 응답 수집은 이번 Phase 2 로컬 검증 범위가 아니다.

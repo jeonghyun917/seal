@@ -31,11 +31,18 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
   -f database/01_schema/001_create_schema.sql
 ```
 
-적용 순서:
+최초 구성 적용 순서:
 
 1. `database/01_schema/001_create_schema.sql`
 2. `database/01_schema/002_create_core_tables.sql`
 3. `database/02_data/001_common_codes.sql`
+
+기존 Phase 1 DB의 Phase 2 추가 적용 순서:
+
+1. `database/03_patch/20260824_001_create_consent_template_tables.sql`
+2. `database/03_patch/20260824_002_add_template_draft_replace_function.sql`
+
+두 패치도 각각 SHA-256을 계산해 `script_checksum`으로 전달한다. `20260824_002`는 앱 계정에 DELETE 권한을 주지 않고, 활성 사용자·조직 범위·초안 상태를 검사한 뒤 해당 초안의 항목만 교체하는 `SECURITY DEFINER` 함수를 추가한다.
 
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 
@@ -49,6 +56,17 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
 ```
 
 성공 시 `Phase 1A database verification passed`를 출력한다. 역할, 객체 소유권, 필수 테이블, 앱 권한, 감사 테이블의 추가 전용 권한 또는 변경 이력이 기준과 다르면 오류로 종료한다.
+
+Phase 2 패치 후에는 다음 검증을 순서대로 실행한다.
+
+```bash
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -f database/04_verify/005_consent_template_verify.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -f database/04_verify/006_template_draft_replace_verify.sql
+```
+
+첫 검증은 템플릿 테이블·복합 외래키·권한·감사 이력·기본 역할 권한을 확인한다. 두 번째 검증은 초안 항목 교체 함수의 소유자·실행 권한·고정 검색 경로와 앱 계정의 직접 DELETE 거부를 확인한다.
 
 ## 수동 변경 원칙
 

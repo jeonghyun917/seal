@@ -118,7 +118,7 @@ public class RetentionJobService implements RetentionJobRequestPort {
         if (record.status() == RetentionJobStatus.EXECUTED || record.status() == RetentionJobStatus.CONFIRMED) {
             if (Objects.equals(key, record.idempotencyKey())) {
                 return new RetentionExecutionResult(record.destroyedMailCount(), record.destroyedFileCount(),
-                        record.recipientPiiDestroyed());
+                        record.destroyedSessionCount(), record.destroyedRightsCount(), record.recipientPiiDestroyed());
             }
             throw new IllegalStateException("이미 다른 멱등키로 실행된 작업입니다.");
         }

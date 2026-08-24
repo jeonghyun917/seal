@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-24-phase6-evidence-rights-lifecycle-design.md`
 
-**실행 상태:** 2026-08-24 구현 완료. `seal_test`·`seal_dev`에 `005`·`006`을 적용하고 검증 SQL `009`·`010`을 통과했다. 전체 자동화 테스트 222건과 실제 PostgreSQL 증적·권리요청·기산일/보존 보류·파기·통계 통합 테스트가 통과했다. Rocky Linux, 백업·복구, 운영 HTTPS·실 SMTP는 계획대로 운영 인수 범위에 남겼다.
+**실행 상태:** 2026-08-24 구현 완료. `seal_test`·`seal_dev`에 `005`·`006`·`007`을 적용하고 검증 SQL `009`·`010`·`011`을 통과했다. 전체 자동화 테스트 223건과 실제 PostgreSQL 증적·권리요청·기산일/보존 보류·잔여정보 파기·통계 통합 테스트가 통과했다. Rocky Linux, 백업·복구, 운영 HTTPS·실 SMTP는 계획대로 운영 인수 범위에 남겼다.
 
 ## Global Constraints
 

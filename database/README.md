@@ -60,8 +60,9 @@ Phase 6 증적·권리요청·보유기간 수명주기는 다음 패치를 순�
 
 1. `database/03_patch/20260824_005_create_evidence_rights_retention_tables.sql`
 2. `database/03_patch/20260824_006_backfill_evidence_queue.sql`
+3. `database/03_patch/20260824_007_add_residual_destruction.sql`
 
-`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 패치 전에 이미 완료된 응답의 요청 완료시각을 보완하고 증적 큐를 멱등하게 생성한다. 두 파일 모두 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 `005`를 수정해 재사용하지 않는다.
+`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 패치 전에 이미 완료된 응답의 요청 완료시각을 보완하고 증적 큐를 멱등하게 생성한다. `007`은 완료 공개 세션 흐름값과 종료 권리요청 암호화 메모를 파기하고 결과 건수를 기록할 수 있도록 수명주기 제약을 보강한다. 각 파일은 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 SQL을 수정해 재사용하지 않는다.
 
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 
@@ -118,11 +119,14 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
   -f database/04_verify/009_evidence_rights_retention_verify.sql
 sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
   -v target_database=seal_dev \
-  -v expected_checksum='<20260824_006 sha256>' \
   -f database/04_verify/010_evidence_queue_backfill_verify.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -v target_database=seal_dev \
+  -v expected_checksum='<20260824_007 sha256>' \
+  -f database/04_verify/011_residual_destruction_verify.sql
 ```
 
-`009`는 테이블·FK·CHECK·부분 유일 인덱스·소유권·최소권한과 불변 테이블의 UPDATE/DELETE 거부를 확인한다. `010`은 완료 응답마다 활성 증적 큐가 정확히 하나이고 두 번째 패치의 적용 체크섬이 일치하는지 확인한다.
+`009`는 테이블·FK·CHECK·부분 유일 인덱스·소유권·최소권한과 불변 테이블의 UPDATE/DELETE 거부를 확인한다. `010`은 완료 응답마다 활성 증적 큐가 정확히 하나인지 확인한다. `011`은 잔여정보 파기 컬럼·nullable 수명주기·최소권한과 `007` 적용 체크섬을 확인한다.
 
 ## 수동 변경 원칙
 

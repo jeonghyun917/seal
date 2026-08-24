@@ -66,8 +66,14 @@ BEGIN
         RAISE EXCEPTION 'audit_event must be append-only for seal_app';
     END IF;
 
-    IF (SELECT count(*) FROM seal.db_change_history) <> 3 THEN
-        RAISE EXCEPTION 'expected exactly three initial change-history rows';
+    IF (SELECT count(*)
+          FROM seal.db_change_history
+         WHERE script_name IN (
+             '01_schema/001_create_schema.sql',
+             '01_schema/002_create_core_tables.sql',
+             '02_data/001_common_codes.sql'
+         )) <> 3 THEN
+        RAISE EXCEPTION 'expected all three initial change-history rows';
     END IF;
 
     IF EXISTS (

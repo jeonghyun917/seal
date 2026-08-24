@@ -18,6 +18,8 @@ public interface ConsentRequestMapper {
                @Param("now") Instant now);
     int updateDraft(@Param("row") ConsentRequestRecord row, @Param("actorId") UUID actorId,
                     @Param("now") Instant now, @Param("versionNo") long versionNo);
+    List<ConsentRequestRecord> findScoped(@Param("actorId") UUID actorId,
+                                          @Param("requestId") UUID requestId);
     List<ConsentRequestRecord> findScopedForUpdate(@Param("actorId") UUID actorId,
                                                     @Param("requestId") UUID requestId);
     int insertSnapshot(@Param("requestId") UUID requestId, @Param("snapshotId") UUID snapshotId,

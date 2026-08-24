@@ -25,6 +25,9 @@ public class MyBatisConsentRequestRepository implements ConsentRequestRepository
     @Override public boolean updateDraft(ConsentRequestRecord row, UUID actorId, Instant now, long versionNo) {
         return mapper.updateDraft(row, actorId, now, versionNo) == 1;
     }
+    @Override public Optional<ConsentRequestRecord> findScoped(UUID actorId, UUID id) {
+        return mapper.findScoped(actorId, id).stream().findFirst();
+    }
     @Override public Optional<ConsentRequestRecord> findScopedForUpdate(UUID actorId, UUID id) {
         return mapper.findScopedForUpdate(actorId, id).stream().findFirst();
     }

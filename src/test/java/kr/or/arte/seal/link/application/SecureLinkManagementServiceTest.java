@@ -53,6 +53,7 @@ class SecureLinkManagementServiceTest {
         }
         @Override public Optional<ConsentRequestRecord> findByIdempotency(UUID a, UUID o, UUID k){return Optional.empty();}
         @Override public void insert(ConsentRequestRecord r, UUID a, Instant n){}
+        @Override public Optional<ConsentRequestRecord> findScoped(UUID a, UUID id){return Optional.of(row);}
         @Override public Optional<ConsentRequestRecord> findScopedForUpdate(UUID a, UUID id){return Optional.of(row);}
         @Override public void insertSnapshot(UUID r, UUID s, RequestSnapshot v, UUID a, Instant n){}
         @Override public boolean markReady(UUID r, UUID s, UUID a, Instant n, long v){return false;}

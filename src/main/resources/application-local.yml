@@ -15,7 +15,7 @@ server:
 
 seal:
   mail:
-    enabled: false
+    enabled: ${SEAL_MAIL_ENABLED:false}
 
 management:
   health:

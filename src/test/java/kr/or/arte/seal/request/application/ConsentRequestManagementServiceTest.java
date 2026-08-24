@@ -112,6 +112,9 @@ class ConsentRequestManagementServiceTest {
         @Override public Optional<ConsentRequestRecord> findScopedForUpdate(UUID actor, UUID id) {
             return Optional.ofNullable(rows.get(id));
         }
+        @Override public Optional<ConsentRequestRecord> findScoped(UUID actor, UUID id) {
+            return Optional.ofNullable(rows.get(id));
+        }
         @Override public void insertSnapshot(UUID requestId, UUID snapshotId, RequestSnapshot value,
                 UUID actor, Instant now) { snapshot = value; }
         @Override public boolean markReady(UUID id, UUID snapshotId, UUID actor, Instant now, long version) {

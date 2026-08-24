@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface ConsentRequestRepository {
     Optional<ConsentRequestRecord> findByIdempotency(UUID actorId, UUID organizationId, UUID idempotencyKey);
     void insert(ConsentRequestRecord row, UUID actorId, Instant now);
+    Optional<ConsentRequestRecord> findScoped(UUID actorId, UUID requestId);
     Optional<ConsentRequestRecord> findScopedForUpdate(UUID actorId, UUID requestId);
     void insertSnapshot(UUID requestId, UUID snapshotId, RequestSnapshot snapshot,
                         UUID actorId, Instant now);

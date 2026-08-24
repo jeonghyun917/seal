@@ -22,12 +22,14 @@ spring:
       max-lifetime: 1800000
   mail:
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}
-    port: ${SEAL_SMTP_PORT:465}
+    port: ${SEAL_SMTP_PORT:25}
     test-connection: false
     properties:
       mail.smtp.auth: false
-      mail.smtp.ssl.enable: true
-      mail.smtp.ssl.checkserveridentity: true
+      mail.smtp.ssl.enable: ${SEAL_SMTP_SSL_ENABLED:false}
+      mail.smtp.ssl.checkserveridentity: ${SEAL_SMTP_SSL_ENABLED:false}
+      mail.smtp.starttls.enable: false
+      mail.smtp.starttls.required: false
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000
@@ -91,10 +93,10 @@ seal:
   mail:
     enabled: ${SEAL_MAIL_ENABLED:false}
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}
-    port: ${SEAL_SMTP_PORT:465}
-    ssl-enabled: true
+    port: ${SEAL_SMTP_PORT:25}
+    ssl-enabled: ${SEAL_SMTP_SSL_ENABLED:false}
     auth-enabled: false
-    from-address: ${SEAL_MAIL_FROM_ADDRESS:no-reply@arte.or.kr}
+    from-address: ${SEAL_MAIL_FROM_ADDRESS:seal@arte.or.kr}
     from-name: ${SEAL_MAIL_FROM_NAME:개인정보 동의 안내}
   personal-data:
     active-key-id: ${SEAL_DATA_ACTIVE_KEY_ID:}

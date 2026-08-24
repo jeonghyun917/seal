@@ -31,6 +31,20 @@ class MailRelayPropertiesTest {
     }
 
     @Test
+    void enabledRelayAcceptsPort25WithoutSslOrAuthentication() {
+        MailRelayProperties properties = new MailRelayProperties(
+                true,
+                "relay.govkorea.com",
+                25,
+                false,
+                false,
+                "seal@arte.or.kr",
+                "개인정보 동의 안내");
+
+        assertThat(validator.validate(properties)).isEmpty();
+    }
+
+    @Test
     void enabledRelayRejectsSenderOutsideArteDomain() {
         MailRelayProperties properties = new MailRelayProperties(
                 true,
@@ -46,7 +60,7 @@ class MailRelayPropertiesTest {
     }
 
     @Test
-    void enabledRelayRejectsAuthenticationOrPlainTextConnection() {
+    void enabledRelayRejectsAuthentication() {
         MailRelayProperties properties = new MailRelayProperties(
                 true,
                 "relay.govkorea.com",
@@ -57,6 +71,21 @@ class MailRelayPropertiesTest {
                 "개인정보 동의 안내");
 
         assertThat(validator.validate(properties))
-                .anyMatch(violation -> violation.getMessage().contains("SSL/TLS"));
+                .anyMatch(violation -> violation.getMessage().contains("무인증"));
+    }
+
+    @Test
+    void enabledRelayRejectsPortAndSslModeMismatch() {
+        MailRelayProperties properties = new MailRelayProperties(
+                true,
+                "relay.govkorea.com",
+                25,
+                true,
+                false,
+                "seal@arte.or.kr",
+                "개인정보 동의 안내");
+
+        assertThat(validator.validate(properties))
+                .anyMatch(violation -> violation.getMessage().contains("25/평문"));
     }
 }

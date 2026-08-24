@@ -10,7 +10,8 @@
 - Rocky Linux 물리 서버 한 대
 - Nginx, Tomcat 10.1, PostgreSQL 동시 운영
 - HTML 이메일 안내와 기관 웹페이지의 일회용 보안 링크
-- SMTP `relay.govkorea.com:465`, SSL/TLS, 무인증, 발신 IP 허용
+- SMTP 기본 `relay.govkorea.com:25`, SSL·STARTTLS·인증 없음, 발신 IP 허용
+- SMTP 대안 `relay.govkorea.com:465`, implicit SSL, 무인증
 - 발신 주소 `@arte.or.kr`
 - Flyway 제외, SQL 파일 수동 적용 및 이력 관리
 

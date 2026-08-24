@@ -14,7 +14,7 @@ eGovFrame 5.0 기반 JSP 모듈형 모놀리스 프로젝트다. HTML 이메일�
 | DB | PostgreSQL 16.14 |
 | Build | Maven Wrapper 3.3.4 / Maven 3.9.11 |
 | Deploy | 단일 WAR, Tomcat 10.1 |
-| Mail | `relay.govkorea.com:465`, SSL/TLS, 무인증 |
+| Mail | 기본 `relay.govkorea.com:25`, SSL·STARTTLS·인증 없음 / 대안 `465`, implicit SSL·무인증 |
 
 공식 eGovFrame 5.0 실행환경은 Java 17 이상을 지원한다. 프로젝트에는 공식 Maven 저장소에 실제 게시된 5.0.0 런타임 모듈을 사용한다.
 
@@ -94,7 +94,17 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `http://localhost:9090/admin/statistics`
 - `http://localhost:9090/actuator/health`
 
-로컬 프로필에서는 실제 메일 발송이 비활성화된다. SMTP 테스트는 Rocky Linux 공인 IP 등록 후 승인된 수신 주소로만 수행한다.
+로컬 프로필의 기본값은 실제 메일 발송 비활성화다. 승인된 테스트를 할 때만 프로세스 환경에서 아래 값을 설정하고, 종료 후 다시 `SEAL_MAIL_ENABLED=false`로 되돌린다.
+
+```powershell
+$env:SEAL_MAIL_ENABLED = 'true'
+$env:SEAL_SMTP_HOST = 'relay.govkorea.com'
+$env:SEAL_SMTP_PORT = '25'
+$env:SEAL_SMTP_SSL_ENABLED = 'false'
+$env:SEAL_MAIL_FROM_ADDRESS = 'seal@arte.or.kr'
+```
+
+25번 포트는 기관 허용망 안에서 SSL·STARTTLS·SMTP 인증 없이 사용한다. 인터넷 구간에서 평문 SMTP를 임의로 사용하지 않는다. 465번 포트를 사용할 때는 `SEAL_SMTP_PORT=465`, `SEAL_SMTP_SSL_ENABLED=true`를 함께 설정한다.
 
 ## 패키징
 
@@ -121,7 +131,7 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 - `seal_app`으로 실제 관리자 조회·로그인·실패 잠금·비밀번호 변경
 - `seal_app`의 스키마 변경·DELETE 거부와 감사 테이블 UPDATE·DELETE 거부
 
-실제 SMTP 발송은 공인 IP 허용과 발신주소 확인이 완료될 때까지 로컬 검증 범위에서 제외한다.
+2026-08-24 로컬 통합 검증에서 승인된 발신·수신 주소로 앱 Outbox 실발송을 1건 수행했다. 릴레이 접수는 성공했으며 이 결과는 메일 열람이나 최종 수신을 뜻하지 않는다.
 
 ## Phase 2 동의서 템플릿
 
@@ -137,7 +147,7 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 | `CONSENT_TEMPLATE_APPROVE` | 승인·반려 |
 | `CONSENT_TEMPLATE_PUBLISH` | 발행·폐기 |
 
-역할 권한 외에도 현재 활성 계정의 조직·처리업무 범위를 서버와 DB에서 함께 검사한다. HTML 이메일 실발송, 외부 HTTPS와 일회용 링크 응답 수집은 후속 단계 범위다.
+역할 권한 외에도 현재 활성 계정의 조직·처리업무 범위를 서버와 DB에서 함께 검사한다. Phase 2 당시 HTML 이메일 실발송과 외부 HTTPS는 후속 단계 범위였으며, 현재 HTML 이메일·Outbox는 Phase 3B~5에 구현되고 로컬 SMTP 접수까지 검증됐다.
 
 ### Phase 2 검증 결과
 
@@ -193,7 +203,7 @@ HTML 이메일은 확정 요청 스냅샷을 웹 화면과 함께 단일 원본�
 - PostgreSQL 패치·검증: `20260824_004`, 검증 SQL `008` (`seal_test`, `seal_dev` 통과)
 - 전체 자동화 테스트: 194건, 실패·오류·건너뜀 0건
 - 실제 PostgreSQL 통합 흐름: Excel 암호화 반입·즉시 파기, 공개 GET 무상태·POST 완료·멱등, 링크 재발급·암호화 Outbox 취소/재등록
-- 로컬 SMTP: `SEAL_MAIL_ENABLED=false`로 외부 발송 없이 대기열·HTML 미리보기만 검증
+- 로컬 SMTP: 기본은 `SEAL_MAIL_ENABLED=false`; 승인된 앱 Outbox 실발송 1건이 `SMTP_ACCEPTED`, 시도 1회로 완료됨
 - 실행 산출물과 포트: `target/seal.war`, 9090
 
 ## Phase 6 증적·권리요청·보유기간 수명주기
@@ -220,7 +230,8 @@ $env:SEAL_EVIDENCE_WORKER_ENABLED = 'true'
 
 - PostgreSQL 패치: `20260824_005`, 기존 완료 응답 증적 큐 보강 `20260824_006`, 잔여정보 파기 보강 `20260824_007`
 - 검증 SQL: `009`, `010`, `011` (`seal_test`, `seal_dev` 통과)
-- 전체 자동화 테스트: 223건, 실패·오류·건너뜀 0건
+- 전체 자동화 테스트: 228건, 실패·오류·건너뜀 0건
 - 실제 PostgreSQL 통합 흐름: 증적 큐·권리요청 암호화/상태·기산일 버전·보존 보류·이중 통제 파기·범위 제한 통계
 - 실행 산출물과 포트: `target/seal.war`, 9090
-- 미검증/제외: Rocky Linux, 백업·복구와 백업본 파기, 운영 HTTPS·도메인·Nginx, 실제 SMTP 발송
+- 로컬 SMTP 인수: 2026-08-24 18:21:22 KST, 요청 `CR-20260824-F2UKJTBD`, Outbox 1건, `SMTP_ACCEPTED`, 시도 1회
+- 미검증/제외: Rocky Linux, 백업·복구와 백업본 파기, 운영 HTTPS·도메인·Nginx

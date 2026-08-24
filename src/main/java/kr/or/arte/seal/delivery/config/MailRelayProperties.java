@@ -24,8 +24,9 @@ public record MailRelayProperties(
         return !enabled || fromAddress.toLowerCase().endsWith("@arte.or.kr");
     }
 
-    @AssertTrue(message = "활성화된 SMTP 릴레이는 465 포트의 SSL/TLS와 무인증 방식을 사용해야 합니다.")
-    public boolean isSecureUnauthenticatedRelayWhenEnabled() {
-        return !enabled || (port == 465 && sslEnabled && !authEnabled);
+    @AssertTrue(message = "활성화된 SMTP 릴레이는 25/평문 또는 465/SSL 방식과 무인증을 사용해야 합니다.")
+    public boolean isApprovedUnauthenticatedRelayWhenEnabled() {
+        return !enabled || (!authEnabled
+                && ((port == 25 && !sslEnabled) || (port == 465 && sslEnabled)));
     }
 }

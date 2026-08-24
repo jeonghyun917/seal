@@ -59,6 +59,17 @@
             updated_by=#{actorId}, updated_at=#{now}, version_no=version_no+1
         WHERE consent_request_id=#{row.requestId} AND request_status='DRAFT' AND version_no=#{versionNo}
     </update>
+    <select id="findScoped" resultMap="requestRecord">
+        <include refid="visibleScope"/> SELECT <include refid="columns"/>
+        FROM seal.consent_request request JOIN visible_scope scope
+          ON scope.organization_unit_id = request.organization_unit_id
+        WHERE request.consent_request_id = #{requestId}
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id = #{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id = #{actorId}
+                            AND allowed.processing_activity_id = request.processing_activity_id))
+    </select>
     <select id="findScopedForUpdate" resultMap="requestRecord">
         <include refid="visibleScope"/> SELECT <include refid="columns"/>
         FROM seal.consent_request request JOIN visible_scope scope

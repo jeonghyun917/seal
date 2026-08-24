@@ -21,7 +21,7 @@ public class ConsentRequestQueryService {
 
     @Transactional(readOnly = true)
     public ConsentRequestRecord require(UUID actorId, UUID requestId) {
-        return repository.findScopedForUpdate(actorId, requestId).orElseThrow(RequestNotFoundException::new);
+        return repository.findScoped(actorId, requestId).orElseThrow(RequestNotFoundException::new);
     }
 
     @Transactional(readOnly = true)

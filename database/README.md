@@ -44,6 +44,12 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
 
 두 패치도 각각 SHA-256을 계산해 `script_checksum`으로 전달한다. `20260824_002`는 앱 계정에 DELETE 권한을 주지 않고, 활성 사용자·조직 범위·초안 상태를 검사한 뒤 해당 초안의 항목만 교체하는 `SECURITY DEFINER` 함수를 추가한다.
 
+Phase 3A 대상자·요청 기반은 다음 패치를 추가 적용한다.
+
+1. `database/03_patch/20260824_003_create_recipient_request_tables.sql`
+
+이 패치는 `target_database` psql 변수를 생략하면 `seal_dev`에 적용한다. 테스트 DB에는 `-v target_database=seal_test`를 명시한다. 적용 전 체크섬을 계산해 `script_checksum`으로 전달한다.
+
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 
 ## 3. 검증
@@ -67,6 +73,17 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
 ```
 
 첫 검증은 템플릿 테이블·복합 외래키·권한·감사 이력·기본 역할 권한을 확인한다. 두 번째 검증은 초안 항목 교체 함수의 소유자·실행 권한·고정 검색 경로와 앱 계정의 직접 DELETE 거부를 확인한다.
+
+Phase 3A 패치 후에는 패치 파일의 SHA-256을 `expected_checksum`으로 전달한다.
+
+```bash
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -v target_database=seal_dev \
+  -v expected_checksum='<sha256sum 결과>' \
+  -f database/04_verify/007_recipient_request_verify.sql
+```
+
+성공 시 `Phase 3A recipient request verification passed`를 출력한다. 대상자·요청·스냅샷·이력·링크 테이블의 소유권, 복합 외래키, 최소권한, 원문 토큰 컬럼 부재와 SYSTEM_ADMIN 권한을 확인한다.
 
 ## 수동 변경 원칙
 

@@ -16,6 +16,8 @@ public interface ConsentRequestMapper {
             @Param("organizationId") UUID organizationId, @Param("idempotencyKey") UUID key);
     int insert(@Param("row") ConsentRequestRecord row, @Param("actorId") UUID actorId,
                @Param("now") Instant now);
+    int updateDraft(@Param("row") ConsentRequestRecord row, @Param("actorId") UUID actorId,
+                    @Param("now") Instant now, @Param("versionNo") long versionNo);
     List<ConsentRequestRecord> findScopedForUpdate(@Param("actorId") UUID actorId,
                                                     @Param("requestId") UUID requestId);
     int insertSnapshot(@Param("requestId") UUID requestId, @Param("snapshotId") UUID snapshotId,
@@ -37,4 +39,9 @@ public interface ConsentRequestMapper {
                     @Param("now") Instant now);
     List<ConsentRequestRecord> searchScoped(@Param("actorId") UUID actorId,
                                             @Param("status") ConsentRequestStatus status);
+    List<ConsentRequestRecord> findDueForUpdate(@Param("now") Instant now, @Param("limit") int limit);
+    int markExpired(@Param("requestId") UUID requestId, @Param("now") Instant now,
+                    @Param("versionNo") long versionNo);
+    List<String> findSnapshotJsonScoped(@Param("actorId") UUID actorId,
+                                        @Param("requestId") UUID requestId);
 }

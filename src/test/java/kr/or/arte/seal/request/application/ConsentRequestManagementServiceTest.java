@@ -75,6 +75,16 @@ class ConsentRequestManagementServiceTest {
         assertThat(requests.events).contains("CREATED", "FINALIZED");
     }
 
+    @Test
+    void updateDraftRevalidatesReferencesAndUsesOptimisticVersion() {
+        var created = service.create(ACTOR, new CreateConsentRequestCommand(ORG, RECIPIENT,
+                TEMPLATE_VERSION, NOW.plusSeconds(7200), UUID.randomUUID()));
+        service.updateDraft(ACTOR, created.requestId(), new UpdateConsentRequestCommand(
+                RECIPIENT, TEMPLATE_VERSION, NOW.plusSeconds(10800), 0));
+        assertThat(requests.rows.get(created.requestId()).expiresAt()).isEqualTo(NOW.plusSeconds(10800));
+        assertThat(requests.rows.get(created.requestId()).versionNo()).isEqualTo(1);
+    }
+
     private PublishedConsentTemplateReference template() {
         UUID activity = UUID.randomUUID(); UUID activityVersion = UUID.randomUUID();
         UUID retentionVersion = UUID.randomUUID(); UUID dataItem = UUID.randomUUID();
@@ -108,6 +118,9 @@ class ConsentRequestManagementServiceTest {
             ConsentRequestRecord old = rows.get(id);
             rows.put(id, old.withStatus(ConsentRequestStatus.READY, snapshotId, old.versionNo() + 1));
             return true;
+        }
+        @Override public boolean updateDraft(ConsentRequestRecord changed, UUID actor, Instant now, long version) {
+            rows.put(changed.requestId(), changed); return true;
         }
         @Override public boolean cancel(UUID id, UUID actor, Instant now, String reason, long version) { return true; }
         @Override public void insertEvent(UUID id, String type, String actorType, UUID actor,

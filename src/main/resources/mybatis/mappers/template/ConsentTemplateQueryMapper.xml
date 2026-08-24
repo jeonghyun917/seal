@@ -92,4 +92,23 @@
                              AND allowed.processing_activity_id = activity.processing_activity_id)
            )
     </select>
+    <select id="findPublishedOptions" resultType="kr.or.arte.seal.template.application.PublishedConsentTemplateOption">
+        <include refid="visibleScope"/>
+        SELECT version.consent_template_version_id AS template_version_id,
+               template.template_code, template.template_name,
+               activity.activity_name, version.version_number
+        FROM seal.consent_template template
+        JOIN seal.consent_template_version version
+          ON version.consent_template_version_id=template.current_published_version_id
+        JOIN seal.processing_activity activity ON activity.processing_activity_id=template.processing_activity_id
+        JOIN visible_scope scope ON scope.organization_unit_id=activity.owner_organization_unit_id
+        WHERE template.template_status='ACTIVE' AND activity.activity_status='ACTIVE'
+          AND version.workflow_status='PUBLISHED'
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id=#{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id=#{actorId}
+                            AND allowed.processing_activity_id=activity.processing_activity_id))
+        ORDER BY template.template_code
+    </select>
 </mapper>

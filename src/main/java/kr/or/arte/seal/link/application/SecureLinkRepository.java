@@ -8,4 +8,5 @@ public interface SecureLinkRepository {
     void revokeCurrent(UUID requestId, UUID actorId, Instant now, String reason);
     boolean activateRequest(UUID requestId, UUID linkId, UUID actorId, Instant now, long versionNo);
     boolean replaceCurrentLink(UUID requestId, UUID linkId, UUID actorId, Instant now, long versionNo);
+    default void expireCurrent(UUID requestId, Instant now) { }
 }

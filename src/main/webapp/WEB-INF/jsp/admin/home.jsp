@@ -27,7 +27,7 @@
         <a class="active" href="${pageContext.request.contextPath}/admin" aria-current="page">대시보드</a>
         <span class="nav-group">동의 업무</span>
         <a href="${pageContext.request.contextPath}/admin/recipients">동의 대상자</a>
-        <a href="${pageContext.request.contextPath}/admin/consent-requests">동의 요청</a>
+        <a href="${pageContext.request.contextPath}/admin/requests">동의 요청</a>
         <span class="nav-group">기준정보</span>
         <a href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
         <a href="${pageContext.request.contextPath}/admin/retention-policies">보유정책</a>

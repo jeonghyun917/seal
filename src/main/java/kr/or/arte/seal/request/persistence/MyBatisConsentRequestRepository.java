@@ -22,6 +22,9 @@ public class MyBatisConsentRequestRepository implements ConsentRequestRepository
     @Override public void insert(ConsentRequestRecord row, UUID actorId, Instant now) {
         requireOne(mapper.insert(row, actorId, now));
     }
+    @Override public boolean updateDraft(ConsentRequestRecord row, UUID actorId, Instant now, long versionNo) {
+        return mapper.updateDraft(row, actorId, now, versionNo) == 1;
+    }
     @Override public Optional<ConsentRequestRecord> findScopedForUpdate(UUID actorId, UUID id) {
         return mapper.findScopedForUpdate(actorId, id).stream().findFirst();
     }
@@ -48,6 +51,15 @@ public class MyBatisConsentRequestRepository implements ConsentRequestRepository
     }
     @Override public List<ConsentRequestRecord> searchScoped(UUID actor, ConsentRequestStatus status) {
         return mapper.searchScoped(actor, status);
+    }
+    @Override public List<ConsentRequestRecord> findDueForUpdate(Instant now, int limit) {
+        return mapper.findDueForUpdate(now, limit);
+    }
+    @Override public boolean markExpired(UUID requestId, Instant now, long versionNo) {
+        return mapper.markExpired(requestId, now, versionNo) == 1;
+    }
+    @Override public Optional<String> findSnapshotJsonScoped(UUID actorId, UUID requestId) {
+        return mapper.findSnapshotJsonScoped(actorId, requestId).stream().findFirst();
     }
     private static void requireOne(int count) {
         if (count != 1) throw new IllegalStateException("동의 요청 저장 건수가 일치하지 않습니다.");

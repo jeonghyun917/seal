@@ -23,4 +23,9 @@ public class ConsentRequestQueryService {
     public ConsentRequestRecord require(UUID actorId, UUID requestId) {
         return repository.findScopedForUpdate(actorId, requestId).orElseThrow(RequestNotFoundException::new);
     }
+
+    @Transactional(readOnly = true)
+    public String requireSnapshotJson(UUID actorId, UUID requestId) {
+        return repository.findSnapshotJsonScoped(actorId, requestId).orElseThrow(RequestNotFoundException::new);
+    }
 }

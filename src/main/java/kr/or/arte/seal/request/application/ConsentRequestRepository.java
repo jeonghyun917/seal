@@ -18,4 +18,8 @@ public interface ConsentRequestRepository {
     void insertEvent(UUID requestId, String eventType, String actorType, UUID actorId,
                      String reasonCode, Instant now);
     List<ConsentRequestRecord> searchScoped(UUID actorId, ConsentRequestStatus status);
+    default boolean updateDraft(ConsentRequestRecord changed, UUID actorId, Instant now, long versionNo) { return false; }
+    default List<ConsentRequestRecord> findDueForUpdate(Instant now, int limit) { return List.of(); }
+    default boolean markExpired(UUID requestId, Instant now, long versionNo) { return false; }
+    default Optional<String> findSnapshotJsonScoped(UUID actorId, UUID requestId) { return Optional.empty(); }
 }

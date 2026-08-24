@@ -23,6 +23,7 @@ public class MyBatisSecureLinkRepository implements SecureLinkRepository {
             Instant now, long versionNo) {
         return mapper.replaceCurrentLink(requestId, linkId, actorId, now, versionNo) == 1;
     }
+    @Override public void expireCurrent(UUID requestId, Instant now) { mapper.expireCurrent(requestId, now); }
     private static void requireOne(int count) {
         if (count != 1) throw new IllegalStateException("보안 링크 저장 건수가 일치하지 않습니다.");
     }

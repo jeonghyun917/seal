@@ -2,6 +2,7 @@ package kr.or.arte.seal.template.persistence;
 
 import kr.or.arte.seal.template.application.ConsentTemplateSummary;
 import kr.or.arte.seal.template.application.ConsentTemplateVersionSummary;
+import kr.or.arte.seal.template.application.PublishedConsentTemplateOption;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -19,4 +20,5 @@ public interface ConsentTemplateQueryMapper {
                                                      @Param("templateId") UUID templateId);
     List<PublishedTemplateIdentityRow> findPublishedIdentity(@Param("actorId") UUID actorId,
                                                               @Param("templateVersionId") UUID templateVersionId);
+    List<PublishedConsentTemplateOption> findPublishedOptions(@Param("actorId") UUID actorId);
 }

@@ -74,6 +74,26 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
 
     @Override
     @Transactional
+    public void updateDraft(UUID actorId, UUID requestId, UpdateConsentRequestCommand command) {
+        ConsentRequestRecord row = requireVersion(actorId, requestId, command.versionNo());
+        if (row.status() != ConsentRequestStatus.DRAFT) throw conflict();
+        if (command.expiresAt() == null || !command.expiresAt().isAfter(clock.instant())) {
+            throw new IllegalArgumentException("만료일시는 현재 이후여야 합니다.");
+        }
+        var recipient = recipients.findScoped(actorId, command.recipientId()).orElseThrow(RequestNotFoundException::new);
+        if (!recipient.organizationUnitId().equals(row.organizationUnitId())
+                || recipient.status() != RecipientStatus.ACTIVE) throw new RequestNotFoundException();
+        var template = templates.requirePublished(actorId, command.templateVersionId());
+        ConsentRequestRecord changed = row.withDraftReferences(command.recipientId(),
+                template.processingActivityId(), template.processingActivityVersionId(),
+                template.templateId(), template.templateVersionId(), template.retentionPolicyVersionId(),
+                command.expiresAt(), command.versionNo() + 1);
+        if (!repository.updateDraft(changed, actorId, clock.instant(), command.versionNo())) throw conflict();
+        audit("CONSENT_REQUEST_UPDATE", changed, actorId, null);
+    }
+
+    @Override
+    @Transactional
     public void finalizeRequest(UUID actorId, UUID requestId, long versionNo) {
         ConsentRequestRecord row = requireVersion(actorId, requestId, versionNo);
         PublishedConsentTemplateReference template = templates.requirePublished(actorId, row.templateVersionId());

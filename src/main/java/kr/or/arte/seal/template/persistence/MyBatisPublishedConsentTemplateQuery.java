@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.List;
+import kr.or.arte.seal.template.application.PublishedConsentTemplateOption;
 
 @Repository
 public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTemplateQuery {
@@ -42,5 +44,10 @@ public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTem
                 detail.version().contentHash(), renderer.toView(detail, activity),
                 detail.version().items().stream().collect(Collectors.toUnmodifiableMap(
                         item -> item.order(), item -> item.processingDataItemIds())));
+    }
+
+    @Override
+    public List<PublishedConsentTemplateOption> findAllPublished(UUID actorId) {
+        return mapper.findPublishedOptions(actorId);
     }
 }

@@ -26,4 +26,12 @@
             updated_at=#{now}, version_no=version_no+1
         WHERE consent_request_id=#{requestId} AND request_status='ACTIVE' AND version_no=#{versionNo}
     </update>
+    <update id="expireCurrent">
+        UPDATE seal.secure_link link SET link_status='EXPIRED', expired_at=#{now},
+            version_no=link.version_no+1
+        FROM seal.consent_request request
+        WHERE request.consent_request_id=#{requestId}
+          AND link.secure_link_id=request.current_secure_link_id
+          AND link.link_status IN ('ISSUED','ACCESSED')
+    </update>
 </mapper>

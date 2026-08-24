@@ -18,4 +18,5 @@ public interface SecureLinkMapper {
     int replaceCurrentLink(@Param("requestId") UUID requestId, @Param("linkId") UUID linkId,
                            @Param("actorId") UUID actorId, @Param("now") Instant now,
                            @Param("versionNo") long versionNo);
+    int expireCurrent(@Param("requestId") UUID requestId, @Param("now") Instant now);
 }

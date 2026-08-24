@@ -18,4 +18,13 @@ public record ConsentRequestRecord(UUID requestId, String requestCode, UUID orga
                 retentionPolicyVersionId, changed, expiresAt, idempotencyKey,
                 currentSecureLinkId, changedSnapshotId, createdBy, createdAt, changedVersionNo);
     }
+    public ConsentRequestRecord withDraftReferences(UUID changedRecipientId,
+            UUID changedProcessingActivityId, UUID changedProcessingActivityVersionId,
+            UUID changedTemplateId, UUID changedTemplateVersionId,
+            UUID changedRetentionVersionId, Instant changedExpiresAt, long changedVersionNo) {
+        return new ConsentRequestRecord(requestId, requestCode, organizationUnitId, changedRecipientId,
+                changedProcessingActivityId, changedProcessingActivityVersionId, changedTemplateId,
+                changedTemplateVersionId, changedRetentionVersionId, status, changedExpiresAt,
+                idempotencyKey, currentSecureLinkId, snapshotId, createdBy, createdAt, changedVersionNo);
+    }
 }

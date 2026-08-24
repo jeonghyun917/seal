@@ -50,6 +50,15 @@
             #{row.templateVersionId}, #{row.retentionPolicyVersionId}, #{row.status},
             #{row.expiresAt}, #{row.idempotencyKey}, #{actorId}, #{now}, #{actorId}, #{now}, 0)
     </insert>
+    <update id="updateDraft">
+        UPDATE seal.consent_request SET recipient_id=#{row.recipientId},
+            processing_activity_id=#{row.processingActivityId},
+            processing_activity_version_id=#{row.processingActivityVersionId},
+            consent_template_id=#{row.templateId}, consent_template_version_id=#{row.templateVersionId},
+            retention_policy_version_id=#{row.retentionPolicyVersionId}, expires_at=#{row.expiresAt},
+            updated_by=#{actorId}, updated_at=#{now}, version_no=version_no+1
+        WHERE consent_request_id=#{row.requestId} AND request_status='DRAFT' AND version_no=#{versionNo}
+    </update>
     <select id="findScopedForUpdate" resultMap="requestRecord">
         <include refid="visibleScope"/> SELECT <include refid="columns"/>
         FROM seal.consent_request request JOIN visible_scope scope
@@ -105,5 +114,25 @@
           ON scope.organization_unit_id = request.organization_unit_id
         <where><if test="status != null">request.request_status = #{status}</if></where>
         ORDER BY request.created_at DESC, request.consent_request_id LIMIT 100
+    </select>
+    <select id="findDueForUpdate" resultMap="requestRecord">
+        SELECT <include refid="columns"/> FROM seal.consent_request request
+        WHERE request.request_status IN ('READY','ACTIVE') AND request.expires_at &lt;= #{now}
+        ORDER BY request.expires_at, request.consent_request_id
+        LIMIT #{limit} FOR UPDATE OF request SKIP LOCKED
+    </select>
+    <update id="markExpired">
+        UPDATE seal.consent_request SET request_status='EXPIRED', updated_at=#{now},
+            version_no=version_no+1
+        WHERE consent_request_id=#{requestId} AND request_status IN ('READY','ACTIVE')
+          AND expires_at &lt;= #{now} AND version_no=#{versionNo}
+    </update>
+    <select id="findSnapshotJsonScoped" resultType="string">
+        <include refid="visibleScope"/>
+        SELECT snapshot.snapshot_json::text
+        FROM seal.consent_request request
+        JOIN visible_scope scope ON scope.organization_unit_id=request.organization_unit_id
+        JOIN seal.consent_request_snapshot snapshot ON snapshot.consent_request_id=request.consent_request_id
+        WHERE request.consent_request_id=#{requestId}
     </select>
 </mapper>

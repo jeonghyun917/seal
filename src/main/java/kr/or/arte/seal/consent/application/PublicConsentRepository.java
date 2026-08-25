@@ -1,6 +1,7 @@
 package kr.or.arte.seal.consent.application;
+import kr.or.arte.seal.request.application.PublicConsentSessionLifecycle;
 import java.time.Instant; import java.util.*;
-public interface PublicConsentRepository {
+public interface PublicConsentRepository extends PublicConsentSessionLifecycle {
  Optional<PublicLinkRecord> findLink(String tokenHmac); Optional<PublicLinkRecord> findLinkForUpdate(String tokenHmac);
  void markAccessed(UUID linkId,Instant now); void insertSession(PublicConsentSessionRecord session);
  default Optional<PublicLinkRecord> findLinkCandidates(List<String> hashes){for(String hash:hashes){var found=findLink(hash);if(found.isPresent())return found;}return Optional.empty();}
@@ -13,4 +14,6 @@ public interface PublicConsentRepository {
  default Optional<ConsentSubmissionResult> findResponse(UUID requestId,UUID idempotencyKey){return Optional.empty();}
  default void insertResponse(ConsentResponseRecord response,List<ConsentResponseItemRecord> items){throw new UnsupportedOperationException();}
  default void complete(UUID requestId,UUID linkId,UUID sessionId,Instant now){throw new UnsupportedOperationException();}
+ default int expireSession(UUID sessionId,Instant now){return 0;}
+ default int expireDueSessions(Instant now,int limit){return 0;}
 }

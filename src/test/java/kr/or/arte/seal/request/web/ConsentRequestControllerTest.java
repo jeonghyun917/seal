@@ -46,13 +46,17 @@ class ConsentRequestControllerTest {
     @MockitoBean DatabaseAuthenticationProvider databaseAuthenticationProvider;
 
     @Test
-    void activateShowsIssuedLinkWithoutTokenInRedirectUrl() throws Exception {
-        given(links.activate(any(), eq(REQUEST), anyLong()))
-                .willReturn(new IssuedSecureLink("opaque-token", Instant.parse("2026-08-25T00:00:00Z")));
+    void directActivateEndpointIsNotExposed() throws Exception {
         mvc.perform(post("/admin/requests/{id}/activate", REQUEST).param("versionNo", "1")
                         .with(csrf()).with(authentication(admin("CONSENT_REQUEST_ACTIVATE"))))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/admin/requests/" + REQUEST + "/issued-link"));
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void directReissueEndpointIsNotExposed() throws Exception {
+        mvc.perform(post("/admin/requests/{id}/reissue", REQUEST).param("versionNo", "1")
+                        .with(csrf()).with(authentication(admin("CONSENT_REQUEST_LINK_REISSUE"))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

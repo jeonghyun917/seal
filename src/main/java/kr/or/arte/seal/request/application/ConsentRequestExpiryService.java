@@ -10,9 +10,11 @@ import java.time.Clock;
 public class ConsentRequestExpiryService {
     private final ConsentRequestRepository requests;
     private final SecureLinkRepository links;
+    private final PublicConsentSessionLifecycle sessions;
     private final Clock clock;
-    public ConsentRequestExpiryService(ConsentRequestRepository requests, SecureLinkRepository links, Clock clock) {
-        this.requests=requests; this.links=links; this.clock=clock;
+    public ConsentRequestExpiryService(ConsentRequestRepository requests, SecureLinkRepository links,
+            PublicConsentSessionLifecycle sessions, Clock clock) {
+        this.requests=requests; this.links=links; this.sessions=sessions; this.clock=clock;
     }
     @Transactional
     public int expireDue(int limit) {
@@ -21,6 +23,7 @@ public class ConsentRequestExpiryService {
         for (var request : requests.findDueForUpdate(clock.instant(), limit)) {
             links.expireCurrent(request.requestId(), clock.instant());
             if (requests.markExpired(request.requestId(), clock.instant(), request.versionNo())) {
+                sessions.expireSessions(request.requestId(), clock.instant());
                 requests.insertEvent(request.requestId(), "EXPIRED", "SYSTEM", null, "TIME_LIMIT", clock.instant());
                 changed++;
             }

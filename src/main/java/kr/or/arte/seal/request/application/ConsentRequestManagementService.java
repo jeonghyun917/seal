@@ -31,15 +31,19 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
     private final RequestSnapshotFactory snapshots;
     private final AuditEventWriter auditWriter;
     private final SecureLinkRepository links;
+    private final ConsentRestrictionQuery restrictions;
+    private final PublicConsentSessionLifecycle sessions;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
     public ConsentRequestManagementService(ConsentRequestRepository repository,
             RecipientRepository recipients, PublishedConsentTemplateQuery templates,
             RequestSnapshotFactory snapshots, AuditEventWriter auditWriter,
-            SecureLinkRepository links, Clock clock) {
+            SecureLinkRepository links, ConsentRestrictionQuery restrictions,
+            PublicConsentSessionLifecycle sessions, Clock clock) {
         this.repository = repository; this.recipients = recipients; this.templates = templates;
-        this.snapshots = snapshots; this.auditWriter = auditWriter; this.links = links; this.clock = clock;
+        this.snapshots = snapshots; this.auditWriter = auditWriter; this.links = links;
+        this.restrictions = restrictions; this.sessions = sessions; this.clock = clock;
     }
 
     @Override
@@ -55,6 +59,7 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         var recipient = recipients.findScoped(actorId, command.recipientId()).orElseThrow(RequestNotFoundException::new);
         if (!recipient.organizationUnitId().equals(command.organizationUnitId())
                 || recipient.status() != RecipientStatus.ACTIVE) throw new RequestNotFoundException();
+        requireNotRestricted(recipient.recipientId());
         PublishedConsentTemplateReference template = templates.requirePublished(actorId, command.templateVersionId());
         ConsentRequestRecord row = new ConsentRequestRecord(UUID.randomUUID(), requestCode(),
                 command.organizationUnitId(), command.recipientId(), template.processingActivityId(),
@@ -83,6 +88,7 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         var recipient = recipients.findScoped(actorId, command.recipientId()).orElseThrow(RequestNotFoundException::new);
         if (!recipient.organizationUnitId().equals(row.organizationUnitId())
                 || recipient.status() != RecipientStatus.ACTIVE) throw new RequestNotFoundException();
+        requireNotRestricted(recipient.recipientId());
         var template = templates.requirePublished(actorId, command.templateVersionId());
         ConsentRequestRecord changed = row.withDraftReferences(command.recipientId(),
                 template.processingActivityId(), template.processingActivityVersionId(),
@@ -96,6 +102,8 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
     @Transactional
     public void finalizeRequest(UUID actorId, UUID requestId, long versionNo) {
         ConsentRequestRecord row = requireVersion(actorId, requestId, versionNo);
+        if (row.status() != ConsentRequestStatus.DRAFT) throw conflict();
+        requireNotRestricted(row.recipientId());
         PublishedConsentTemplateReference template = templates.requirePublished(actorId, row.templateVersionId());
         if (!template.templateId().equals(row.templateId())
                 || !template.processingActivityVersionId().equals(row.processingActivityVersionId())
@@ -131,6 +139,7 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
                 row.currentSecureLinkId(), row.versionNo()).cancel();
         links.revokeCurrent(requestId, actorId, clock.instant(), "REQUEST_CANCELLED");
         if (!repository.cancel(requestId, actorId, clock.instant(), reason.strip(), versionNo)) throw conflict();
+        sessions.expireSessions(requestId, clock.instant());
         repository.insertEvent(requestId, "CANCELLED", "ADMIN", actorId, "ADMIN_CANCEL", clock.instant());
         audit("CONSENT_REQUEST_CANCEL", row, actorId, "ADMIN_CANCEL");
     }
@@ -141,6 +150,13 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         if (row.versionNo() != version) throw conflict();
         return row;
     }
+    private void requireNotRestricted(UUID recipientId) {
+        if (restrictions.hasActiveRestriction(recipientId,
+                clock.instant().atZone(ZoneId.of("Asia/Seoul")).toLocalDate())) {
+            throw new RequestBusinessConflictException("처리제한 중인 대상자에게 동의 요청을 생성하거나 확정할 수 없습니다.");
+        }
+    }
+
 
     private String requestCode() {
         StringBuilder suffix = new StringBuilder(8);

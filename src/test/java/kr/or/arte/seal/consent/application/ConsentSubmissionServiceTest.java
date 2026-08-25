@@ -24,5 +24,6 @@ class ConsentSubmissionServiceTest {
   public List<PublicConsentItem> findItems(UUID r){return items;}public Optional<ConsentSubmissionResult> findResponse(UUID r,UUID i){return Objects.equals(i,existingKey)?Optional.ofNullable(existing):Optional.empty();}
   public void insertResponse(ConsentResponseRecord r,List<ConsentResponseItemRecord> values){existingKey=r.idempotencyKey();existing=new ConsentSubmissionResult(r.responseId(),r.status(),false);}
   public void complete(UUID r,UUID l,UUID s,Instant n){completed=true;}
+  public void expireSessions(UUID requestId,Instant now){}
  }
 }

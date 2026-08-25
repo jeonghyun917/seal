@@ -63,8 +63,9 @@ Phase 6 증적·권리요청·보유기간 수명주기는 다음 패치를 순�
 3. `database/03_patch/20260824_007_add_residual_destruction.sql`
 4. `database/03_patch/20260825_008_harden_rights_scope_integrity.sql`
 5. `database/03_patch/20260825_009_add_crypto_key_versions.sql`
+6. `database/03_patch/20260825_010_allow_legal_hold_reasons.sql`
 
-`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 기존 완료 응답의 증적 큐를 보완하고, `007`은 잔여정보 파기 제약을 보강한다. `008`은 권리요청·긴급 파기의 조직 범위와 복합 참조 무결성을 강제하고, `009`는 권리요청 암호문과 증적 HMAC의 키 ID를 저장한다. 각 파일은 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 SQL을 수정해 재사용하지 않는다.
+`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 기존 완료 응답의 증적 큐를 보완하고, `007`은 잔여정보 파기 제약을 보강한다. `008`은 권리요청·긴급 파기의 조직 범위와 복합 참조 무결성을 강제하고, `009`는 권리요청 암호문과 증적 HMAC의 키 ID를 저장한다. `010`은 동의 요청과 보류 사유 단위로 활성 보존 보류의 유일성을 보장한다. 각 파일은 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 SQL을 수정해 재사용하지 않는다.
 
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 
@@ -126,9 +127,13 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
   -v target_database=seal_dev \
   -v expected_checksum='<20260824_007 sha256>' \
   -f database/04_verify/011_residual_destruction_verify.sql
+sudo -u postgres psql -X -v ON_ERROR_STOP=1 \
+  -v target_database=seal_dev -v expected_checksum='<20260825_010 sha256>' \
+  -f database/04_verify/014_legal_hold_reasons_verify.sql
+
 ```
 
-`009`는 테이블·FK·CHECK·부분 유일 인덱스·소유권·최소권한과 불변 테이블의 UPDATE/DELETE 거부를 확인한다. `010`은 완료 응답마다 활성 증적 큐가 정확히 하나인지 확인한다. `011`은 잔여정보 파기 컬럼·nullable 수명주기·최소권한과 `007` 적용 체크섬을 확인한다.
+`009`는 테이블·FK·CHECK·부분 유일 인덱스·소유권·최소권한과 불변 테이블의 UPDATE/DELETE 거부를 확인한다. `010`은 완료 응답마다 활성 증적 큐가 정확히 하나인지 확인한다. `011`은 잔여정보 파기 컬럼·nullable 수명주기·최소권한과 `007` 적용 체크섬을 확인한다. `014`는 서로 다른 활성 보류 사유의 공존 인덱스와 `010` 패치 체크섬을 확인한다.
 
 ## 수동 변경 원칙
 

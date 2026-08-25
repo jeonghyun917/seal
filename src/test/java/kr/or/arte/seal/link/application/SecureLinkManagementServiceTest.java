@@ -26,6 +26,7 @@ class SecureLinkManagementServiceTest {
         FakeLinkRepository links = new FakeLinkRepository();
         SecureLinkManagementService service = new SecureLinkManagementService(requests, links,
                 new SecureTokenGenerator(new SecureRandom()), new SecureLinkHasher(new byte[32]),
+                (recipientId, today) -> false,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         IssuedSecureLink issued = service.activate(ACTOR, REQUEST, 0);

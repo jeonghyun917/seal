@@ -10,6 +10,7 @@ import java.time.*; import java.util.*;
  @Transactional public ConsentSubmissionResult submit(String flowId,Map<UUID,ConsentDecision> decisions,UUID idempotencyKey){if(idempotencyKey==null)throw new IllegalArgumentException("제출 멱등키가 필요합니다.");Instant now=clock.instant();
   var session=repository.findSessionForUpdateCandidates(hasher.candidates("flow:"+flowId),now).orElseThrow(()->new IllegalArgumentException("동의 세션이 만료되었습니다."));
   var previous=repository.findResponse(session.requestId(),idempotencyKey);if(previous.isPresent()){var p=previous.get();return new ConsentSubmissionResult(p.responseId(),p.status(),true);}
+  if("ACTIVE".equals(session.sessionStatus())&&!session.expiresAt().isAfter(now))repository.expireSession(session.sessionId(),now);
   if(!"ACTIVE".equals(session.sessionStatus())||!session.expiresAt().isAfter(now)||session.requestStatus()!=ConsentRequestStatus.ACTIVE)throw new IllegalStateException("이미 완료되었거나 만료된 요청입니다.");
   var items=repository.findItems(session.requestId());ConsentDecisionValidator.validate(items.stream().map(PublicConsentItem::itemId).toList(),decisions);
   UUID responseId=UUID.randomUUID();ConsentResponseStatus status=decisions.values().stream().allMatch(d->d==ConsentDecision.DISAGREE)?ConsentResponseStatus.DECLINED_ALL:ConsentResponseStatus.SUBMITTED;

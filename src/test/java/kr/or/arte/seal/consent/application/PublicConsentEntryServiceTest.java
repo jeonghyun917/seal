@@ -26,5 +26,6 @@ class PublicConsentEntryServiceTest {
   public Optional<PublicLinkRecord> findLinkForUpdate(String h){return findLink(h);}
   public void markAccessed(UUID id,Instant now){accessed=true;}
   public void insertSession(PublicConsentSessionRecord s){}
+  public void expireSessions(UUID requestId,Instant now){}
  }
 }

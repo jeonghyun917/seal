@@ -5,7 +5,6 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.delivery.application.ConsentDeliveryService;
 import kr.or.arte.seal.delivery.application.DeliveryIssueResult;
 import kr.or.arte.seal.link.application.IssuedSecureLink;
-import kr.or.arte.seal.link.application.SecureLinkManagementService;
 import kr.or.arte.seal.recipient.application.RecipientQueryService;
 import kr.or.arte.seal.recipient.domain.RecipientStatus;
 import kr.or.arte.seal.request.application.ConsentRequestManagement;
@@ -35,15 +34,14 @@ public class ConsentRequestController {
     private static final ZoneId KOREA = ZoneId.of("Asia/Seoul");
     private final ConsentRequestManagement management;
     private final ConsentRequestQueryService query;
-    private final SecureLinkManagementService links;
     private final ConsentDeliveryService delivery;
     private final RecipientQueryService recipients;
     private final PublishedConsentTemplateQuery templates; private final String publicBaseUrl;
 
     public ConsentRequestController(ConsentRequestManagement management, ConsentRequestQueryService query,
-            SecureLinkManagementService links, ConsentDeliveryService delivery, RecipientQueryService recipients,
+            ConsentDeliveryService delivery, RecipientQueryService recipients,
             PublishedConsentTemplateQuery templates, @Value("${seal.public-base-url}") String publicBaseUrl) {
-        this.management=management; this.query=query; this.links=links; this.delivery=delivery;
+        this.management=management; this.query=query; this.delivery=delivery;
         this.recipients=recipients; this.templates=templates; this.publicBaseUrl=normalizeBaseUrl(publicBaseUrl);
     }
 
@@ -124,18 +122,6 @@ public class ConsentRequestController {
     public String cancel(@PathVariable UUID requestId, @RequestParam long versionNo, @RequestParam String reason,
             @AuthenticationPrincipal AdminPrincipal principal) {
         management.cancel(principal.adminUserId(), requestId, versionNo, reason); return redirect(requestId);
-    }
-    @PostMapping("/admin/requests/{requestId}/activate") @PreAuthorize("hasAuthority('CONSENT_REQUEST_ACTIVATE')")
-    public String activate(@PathVariable UUID requestId, @RequestParam long versionNo,
-            @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
-        flash(redirect, links.activate(principal.adminUserId(), requestId, versionNo));
-        return "redirect:/admin/requests/"+requestId+"/issued-link";
-    }
-    @PostMapping("/admin/requests/{requestId}/reissue") @PreAuthorize("hasAuthority('CONSENT_REQUEST_LINK_REISSUE')")
-    public String reissue(@PathVariable UUID requestId, @RequestParam long versionNo,
-            @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
-        flash(redirect, links.reissue(principal.adminUserId(), requestId, versionNo));
-        return "redirect:/admin/requests/"+requestId+"/issued-link";
     }
 
     @PostMapping("/admin/requests/{requestId}/deliver")

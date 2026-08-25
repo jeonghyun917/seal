@@ -36,6 +36,7 @@ class ConsentRequestManagementServiceTest {
     private FakeRequestRepository requests;
     private ConsentRequestManagementService service;
     private PublishedConsentTemplateReference publishedTemplate;
+    private final List<UUID> expiredSessions = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -46,7 +47,8 @@ class ConsentRequestManagementServiceTest {
         List<AuditEventCommand> audits = new ArrayList<>();
         service = new ConsentRequestManagementService(requests, recipients, templates,
                 new RequestSnapshotFactory(new com.fasterxml.jackson.databind.ObjectMapper()), audits::add,
-                new NoOpLinkRepository(), Clock.fixed(NOW, ZoneOffset.UTC));
+                new NoOpLinkRepository(), (recipientId, today) -> false,
+                (requestId, now) -> expiredSessions.add(requestId), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -85,8 +87,19 @@ class ConsentRequestManagementServiceTest {
         assertThat(requests.rows.get(created.requestId()).versionNo()).isEqualTo(1);
     }
 
+    @Test
+    void cancelExpiresAllPublicSessionsForTheRequest() {
+        var created = service.create(ACTOR, new CreateConsentRequestCommand(ORG, RECIPIENT,
+                TEMPLATE_VERSION, NOW.plusSeconds(7200), UUID.randomUUID()));
+
+        service.cancel(ACTOR, created.requestId(), 0, "operator requested cancellation");
+
+        assertThat(expiredSessions).containsExactly(created.requestId());
+    }
+
     private PublishedConsentTemplateReference template() {
         UUID activity = UUID.randomUUID(); UUID activityVersion = UUID.randomUUID();
+
         UUID retentionVersion = UUID.randomUUID(); UUID dataItem = UUID.randomUUID();
         var item = new PublishedTemplateView.Item(1, "COLLECT", ConsentItemType.COLLECTION_USE,
                 "개인정보 수집 이용 동의", true, "교육 프로그램 운영 목적", "동의 제출 후 3년",

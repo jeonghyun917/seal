@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfEnvironmentVariable(named="SEAL_DB_PASSWORD",matches=".+")
 class RightsRequestPostgresIntegrationTest {
  @Autowired JdbcTemplate jdbc;@Autowired RecipientManagementService recipients;@Autowired RightsRequestService rights;
+ @org.junit.jupiter.api.BeforeEach void ensureApprover(){jdbc.update("INSERT INTO seal.admin_user(admin_user_id,login_id,display_name,organization_unit_id,password_hash,must_change_password) SELECT ?,'vheraclesv','통합테스트 승인자',organization_unit_id,password_hash,FALSE FROM seal.admin_user WHERE login_id='seal-admin' AND NOT EXISTS(SELECT 1 FROM seal.admin_user WHERE login_id='vheraclesv')",UUID.randomUUID());jdbc.update("INSERT INTO seal.user_scope(user_scope_id,admin_user_id,scope_type,scope_target_id,include_descendants,assigned_by) SELECT gen_random_uuid(),a.admin_user_id,'ORGANIZATION',a.organization_unit_id,TRUE,s.admin_user_id FROM seal.admin_user a JOIN seal.admin_user s ON s.login_id='seal-admin' WHERE a.login_id='vheraclesv' AND NOT EXISTS(SELECT 1 FROM seal.user_scope WHERE admin_user_id=a.admin_user_id AND scope_type='ORGANIZATION' AND scope_target_id=a.organization_unit_id)");}
  @Test void encryptsDetailAndPersistsTheDualControlLifecycle(){
   UUID org=id("SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit=TRUE");
   List<UUID> actors=jdbc.query("SELECT admin_user_id FROM seal.admin_user WHERE account_status='ACTIVE' ORDER BY login_id LIMIT 2",(rs,n)->UUID.fromString(rs.getString(1)));

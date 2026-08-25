@@ -3,7 +3,9 @@ package kr.or.arte.seal.evidence.application;
 import kr.or.arte.seal.audit.application.AuditEventCommand;
 import kr.or.arte.seal.audit.application.AuditEventWriter;
 
-import java.time.*;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,15 +41,29 @@ public final class EvidenceWorker {
     private void process(EvidenceWorkItem item, Instant now) {
         try {
             repository.finalized(item.packageId(), item.rowVersion(), generator.generate(item), now);
+        } catch (EvidenceClaimLostException exception) {
+            audit(item, "EVIDENCE_CLAIM_LOST", "FAILURE", "CLAIM_LOST", now);
+            return;
         } catch (RuntimeException exception) {
-            repository.failed(item.packageId(), item.rowVersion(), "EVIDENCE_GENERATION_FAILED", now);
-            audit(item, "EVIDENCE_GENERATE", "FAILURE", "EVIDENCE_GENERATION_FAILED", now);
+            markFailed(item, now);
             return;
         }
         audit(item, "EVIDENCE_GENERATE", "SUCCESS", null, now);
     }
 
-    private void audit(EvidenceWorkItem item, String action, String result, String reason, Instant now) {
+    private void markFailed(EvidenceWorkItem item, Instant now) {
+        try {
+            repository.failed(item.packageId(), item.rowVersion(),
+                    "EVIDENCE_GENERATION_FAILED", now);
+        } catch (EvidenceClaimLostException exception) {
+            audit(item, "EVIDENCE_CLAIM_LOST", "FAILURE", "CLAIM_LOST", now);
+            return;
+        }
+        audit(item, "EVIDENCE_GENERATE", "FAILURE", "EVIDENCE_GENERATION_FAILED", now);
+    }
+
+    private void audit(EvidenceWorkItem item, String action, String result,
+            String reason, Instant now) {
         audit.append(new AuditEventCommand(now, "SYSTEM", null, action, "EVIDENCE_PACKAGE",
                 item.packageId().toString(), result, reason, UUID.randomUUID(),
                 Map.of("requestId", item.requestId().toString())));

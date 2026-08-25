@@ -11,8 +11,10 @@ import kr.or.arte.seal.consent.application.ConsentSubmissionService;
 import kr.or.arte.seal.consent.application.PublicConsentEntryService;
 import kr.or.arte.seal.consent.application.PublicConsentEntryStatus;
 import kr.or.arte.seal.consent.application.PublicConsentQueryService;
+import kr.or.arte.seal.consent.application.PublicConsentSessionExpiryService;
 import kr.or.arte.seal.request.application.ConsentRequestManagementService;
 import kr.or.arte.seal.request.application.CreateConsentRequestCommand;
+import kr.or.arte.seal.request.application.RequestBusinessConflictException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @SpringBootTest
 @Transactional
 @EnabledIfEnvironmentVariable(named = "SEAL_DB_PASSWORD", matches = ".+")
@@ -37,6 +40,7 @@ class ConsentRequestPostgresIntegrationTest {
     @Autowired PublicConsentEntryService publicEntry;
     @Autowired PublicConsentQueryService publicQuery;
     @Autowired ConsentSubmissionService submissions;
+    @Autowired PublicConsentSessionExpiryService sessionExpiry;
 
     @Test
     void createsAndFinalizesRequestWithImmutableSnapshotRows() {
@@ -61,7 +65,15 @@ class ConsentRequestPostgresIntegrationTest {
                 String.class, created.requestId())).hasSize(64).isNotEqualTo(reissued.issuedLink().token());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.secure_link WHERE consent_request_id=? AND link_status='REVOKED'",
                 Integer.class, created.requestId())).isEqualTo(1);
+        publicEntry.start(reissued.issuedLink().token());
+        jdbc.update("INSERT INTO seal.legal_hold(legal_hold_id,consent_request_id,hold_reason_code,reason_text,held_by,held_at) VALUES(?,?,'RIGHTS_RESTRICTION','integration restriction',?,CURRENT_TIMESTAMP)",
+                UUID.randomUUID(), created.requestId(), actor);
+        assertThatThrownBy(() -> delivery.reissueAndQueue(actor, created.requestId(), 3,
+                "http://localhost:9090", null))
+                .isInstanceOf(RequestBusinessConflictException.class);
         requests.cancel(actor, created.requestId(), 3, "통합테스트 관리자 취소");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.public_consent_session WHERE consent_request_id=? AND session_status='EXPIRED' AND flow_hmac IS NULL AND flow_destroyed_at IS NOT NULL",
+                Integer.class, created.requestId())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.secure_link WHERE consent_request_id=? AND link_status IN ('ISSUED','ACCESSED')",
                 Integer.class, created.requestId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_request_item_data data JOIN seal.consent_request_item item ON item.consent_request_item_id=data.consent_request_item_id JOIN seal.consent_request_snapshot snapshot ON snapshot.consent_request_snapshot_id=item.consent_request_snapshot_id WHERE snapshot.consent_request_id=?",
@@ -92,6 +104,13 @@ class ConsentRequestPostgresIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT link_status FROM seal.secure_link WHERE secure_link_id=?",
                 String.class, deliveryResult.issuedLink().linkId())).isEqualTo("ISSUED");
 
+        var abandoned = publicEntry.start(token);
+        publicEntry.start(token);
+        jdbc.update("UPDATE seal.public_consent_session SET created_at=CURRENT_TIMESTAMP-INTERVAL '2 minutes',expires_at=CURRENT_TIMESTAMP-INTERVAL '1 minute' WHERE consent_request_id=? AND session_status='ACTIVE'",
+                request.requestId());
+        assertThat(sessionExpiry.expireDue(100)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.public_consent_session WHERE consent_request_id=? AND session_status='EXPIRED' AND flow_hmac IS NULL AND flow_destroyed_at IS NOT NULL",
+                Integer.class, request.requestId())).isEqualTo(2);
         var flow = publicEntry.start(token);
         assertThat(jdbc.queryForObject("SELECT link_status FROM seal.secure_link WHERE secure_link_id=?",
                 String.class, deliveryResult.issuedLink().linkId())).isEqualTo("ACCESSED");
@@ -109,6 +128,11 @@ class ConsentRequestPostgresIntegrationTest {
                 String.class, request.requestId())).isEqualTo("COMPLETED");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.consent_response WHERE consent_request_id=?",
                 Integer.class, request.requestId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.public_consent_session WHERE consent_request_id=? AND session_status='EXPIRED' AND flow_hmac IS NULL AND flow_destroyed_at IS NOT NULL",
+                Integer.class, request.requestId())).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM seal.public_consent_session WHERE consent_request_id=? AND session_status='COMPLETED' AND flow_hmac IS NOT NULL",
+                Integer.class, request.requestId())).isEqualTo(1);
+        assertThat(abandoned.flowId()).isNotEqualTo(flow.flowId());
     }
 
     private Fixture publishedFixture(UUID org, UUID creator, UUID approver) {

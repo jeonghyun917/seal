@@ -87,6 +87,7 @@ jobs:
               011_*) source=database/03_patch/20260824_007_add_residual_destruction.sql ;;
               012_*) source=database/03_patch/20260825_008_harden_rights_scope_integrity.sql ;;
               013_*) source=database/03_patch/20260825_009_add_crypto_key_versions.sql ;;
+              014_*) source=database/03_patch/20260825_010_allow_legal_hold_reasons.sql ;;
               *) source="$file" ;;
             esac
             psql -h localhost -U postgres -d postgres -X -v ON_ERROR_STOP=1 \

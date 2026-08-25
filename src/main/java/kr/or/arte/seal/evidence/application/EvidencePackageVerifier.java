@@ -8,14 +8,20 @@ import java.util.Map;
 
 public final class EvidencePackageVerifier {
     private final EvidenceHmacSigner signer;
+    private final String keyId;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public EvidencePackageVerifier(EvidenceHmacSigner signer) {
+        this(signer, signer.activeKeyId());
+    }
+
+    public EvidencePackageVerifier(EvidenceHmacSigner signer, String keyId) {
         this.signer = signer;
+        this.keyId = keyId;
     }
 
     public EvidenceVerificationResult verify(byte[] manifest, String hmac, Map<String, byte[]> files) {
-        if (!signer.verify(manifest, hmac)) {
+        if (!signer.verify(keyId, manifest, hmac)) {
             return EvidenceVerificationResult.INVALID_HMAC;
         }
         try {

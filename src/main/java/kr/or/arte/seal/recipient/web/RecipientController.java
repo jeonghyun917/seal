@@ -40,9 +40,9 @@ public class RecipientController {
     @PreAuthorize("hasAuthority('RECIPIENT_VIEW')")
     public String list(@RequestParam(required = false) String email,
             @RequestParam(required = false) RecipientStatus status,
-            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+            @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("recipients", query.search(principal.adminUserId(), email, status));
+        var pageResult=query.searchPage(principal.adminUserId(),email,status,page,20); model.addAttribute("recipients",pageResult.items()); model.addAttribute("pageResult",pageResult);
         model.addAttribute("email", email);
         model.addAttribute("selectedStatus", status);
         return "admin/recipients/list";

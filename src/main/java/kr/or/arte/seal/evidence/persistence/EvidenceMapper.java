@@ -14,12 +14,12 @@ public interface EvidenceMapper {
                                    @Param("leaseExpiredAt") Instant leaseExpiredAt);
     List<String> decisions(@Param("responseId") UUID responseId);
     List<String> events(@Param("requestId") UUID requestId);
-    void finalizePackage(@Param("packageId") UUID packageId,@Param("generated") GeneratedEvidence generated,
-                         @Param("now") Instant now);
-    void insertFile(@Param("packageId") UUID packageId,@Param("file") EvidenceFileMetadata file,
-                    @Param("now") Instant now);
-    void fail(@Param("packageId") UUID packageId,@Param("code") String code,@Param("now") Instant now);
-    List<EvidencePackageSummary> search(@Param("actorId") UUID actorId,@Param("status") EvidenceGenerationStatus status);
+    int finalizePackage(@Param("packageId") UUID packageId,@Param("claimedRowVersion") long claimedRowVersion,@Param("generated") GeneratedEvidence generated,
+                        @Param("now") Instant now);
+    int insertFile(@Param("packageId") UUID packageId,@Param("file") EvidenceFileMetadata file,
+                   @Param("now") Instant now);
+    int fail(@Param("packageId") UUID packageId,@Param("claimedRowVersion") long claimedRowVersion,@Param("code") String code,@Param("now") Instant now);
+    List<EvidencePackageSummary> search(@Param("actorId") UUID actorId,@Param("status") EvidenceGenerationStatus status,@Param("limit") int limit,@Param("offset") int offset);
     Optional<EvidencePackageDetail> findScoped(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId);
     List<EvidenceFileMetadata> files(@Param("packageId") UUID packageId);
     int requeue(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId,@Param("now") Instant now);

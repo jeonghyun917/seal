@@ -20,6 +20,14 @@ public class ConsentRequestQueryService {
     }
 
     @Transactional(readOnly = true)
+    public kr.or.arte.seal.common.web.AdminPageResult<ConsentRequestSummary> searchPage(UUID actorId,
+            ConsentRequestStatus status,int page,int size){
+        int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
+        var rows=repository.searchScoped(actorId,status,safeSize+1,offset).stream().map(row -> new ConsentRequestSummary(
+                row.requestId(),row.requestCode(),row.recipientId(),row.status(),row.expiresAt(),row.createdAt(),row.versionNo())).toList();
+        return kr.or.arte.seal.common.web.AdminPageResult.of(rows,safePage,safeSize);
+    }
+
     public ConsentRequestRecord require(UUID actorId, UUID requestId) {
         return repository.findScoped(actorId, requestId).orElseThrow(RequestNotFoundException::new);
     }

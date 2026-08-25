@@ -1,4 +1,4 @@
-<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %><%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!doctype html>
 <html lang="ko">
 <head>
@@ -7,49 +7,18 @@
     <title>관리자 홈 | 개인정보 전자동의·증적 관리시스템</title>
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css">
 </head>
-<body class="admin-body">
-<header class="admin-header">
-    <a class="admin-brand" href="${pageContext.request.contextPath}/admin">
-        <span>ARTE</span>
-        <strong>개인정보 전자동의·증적 관리시스템</strong>
-    </a>
-    <div class="user-actions">
-        <span><strong>${administrator.displayName()}</strong> 님</span>
-        <form method="post" action="${pageContext.request.contextPath}/logout">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}">
-            <button class="text-button" type="submit">로그아웃</button>
-        </form>
-    </div>
-</header>
+<body class="admin-body"><jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
 
-<div class="admin-layout">
-    <nav class="admin-nav" aria-label="관리자 주 메뉴">
-        <a class="active" href="${pageContext.request.contextPath}/admin" aria-current="page">대시보드</a>
-        <span class="nav-group">동의 업무</span>
-        <a href="${pageContext.request.contextPath}/admin/recipients">동의 대상자</a>
-        <a href="${pageContext.request.contextPath}/admin/requests">동의 요청</a>
-        <a href="${pageContext.request.contextPath}/admin/mail-outbox">메일 발송함</a>
-        <a href="${pageContext.request.contextPath}/admin/evidence">동의 증적</a>
-        <a href="${pageContext.request.contextPath}/admin/rights">권리요청</a>
-        <a href="${pageContext.request.contextPath}/admin/retention">보유기간·파기</a>
-        <a href="${pageContext.request.contextPath}/admin/statistics">운영 통계</a>
-        <span class="nav-group">기준정보</span>
-        <a href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
-        <a href="${pageContext.request.contextPath}/admin/retention-policies">보유정책</a>
-        <a href="${pageContext.request.contextPath}/admin/processing-activities">처리업무</a>
-        <a href="${pageContext.request.contextPath}/admin/templates">동의서 템플릿</a>
-        <span class="nav-group">시스템 관리</span>
-        <a href="${pageContext.request.contextPath}/admin/users">관리자 계정</a>
-        <a href="${pageContext.request.contextPath}/admin/roles">역할·권한</a>
-        <a href="${pageContext.request.contextPath}/admin/audit-events">감사 이력</a>
-    </nav>
 
-    <main class="admin-main">
+
+
+
+    <div class="admin-layout"><jsp:include page="/WEB-INF/jsp/fragments/admin/sidebar.jsp"/><main class="admin-main">
         <div class="page-heading-row">
             <div>
                 <p class="section-kicker">ADMIN DASHBOARD</p>
                 <h1>관리자 홈</h1>
-                <p>${administrator.displayName()}님, 개인정보 동의 업무 관리 화면입니다.</p>
+                <p><c:out value="${administrator.displayName()}"/>님, 개인정보 동의 업무 관리 화면입니다.</p>
             </div>
             <span class="status-badge">정상 운영</span>
         </div>
@@ -102,7 +71,5 @@
                 <div><dt>감사 기록</dt><dd>로그인·비밀번호 변경 결과 추가 전용 저장</dd></div>
             </dl>
         </section>
-    </main>
-</div>
-</body>
+    </main></div></body>
 </html>

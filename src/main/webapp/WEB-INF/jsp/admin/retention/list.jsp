@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css">
 </head>
-<body class="admin-body">
-<main class="admin-main">
+<body class="admin-body"><jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
+<div class="admin-layout"><jsp:include page="/WEB-INF/jsp/fragments/admin/sidebar.jsp"/><main class="admin-main">
     <div class="page-heading-row">
         <div><p class="section-kicker">RETENTION &amp; DESTRUCTION</p><h1>보유기간·파기 작업</h1>
             <p>보존 보류와 이중 통제를 확인한 뒤 주 저장소 범위만 파기합니다.</p></div>
@@ -60,7 +60,6 @@
         <c:forEach var="item" items="${items}"><tr><td><a href="${pageContext.request.contextPath}/admin/retention/${item.id()}"><c:out value="${item.consentRequestId()}"/></a></td><td><c:out value="${item.status()}"/></td><td><c:out value="${item.dueDate()}"/></td><td><c:out value="${item.destructionMethod()}"/></td><td><c:out value="${item.requestedAt()}"/></td></tr></c:forEach>
         <c:if test="${empty items}"><tr><td colspan="5">파기 작업이 없습니다.</td></tr></c:if>
         </tbody></table></div>
-    </section>
-</main>
-</body>
+    <jsp:include page="/WEB-INF/jsp/fragments/admin/pagination.jsp"/></section>
+</main></div></body>
 </html>

@@ -40,7 +40,7 @@ public interface ConsentRequestMapper {
                     @Param("actorId") UUID actorId, @Param("reasonCode") String reasonCode,
                     @Param("now") Instant now);
     List<ConsentRequestRecord> searchScoped(@Param("actorId") UUID actorId,
-                                            @Param("status") ConsentRequestStatus status);
+                                            @Param("status") ConsentRequestStatus status, @Param("limit") int limit, @Param("offset") int offset);
     List<ConsentRequestRecord> findDueForUpdate(@Param("now") Instant now, @Param("limit") int limit);
     int markExpired(@Param("requestId") UUID requestId, @Param("now") Instant now,
                     @Param("versionNo") long versionNo);

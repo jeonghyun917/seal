@@ -103,6 +103,21 @@ class RecipientManagementServiceTest {
         assertThat(detail.maskedEmail()).isEqualTo("h***@e******.com");
     }
 
+    @Test
+    void destroyedRecipientCannotBeUpdatedOrReactivated() {
+        UUID id = UUID.randomUUID();
+        repository.rows.put(id, new RecipientStoredRecord(id, ORG_ID, null, null, null, null,
+                "동의", RecipientStatus.DESTROYED, 4));
+
+        assertThatThrownBy(() -> service.update(id,
+                new UpdateRecipientCommand(ACTOR_ID, "새 이름", "new@example.com", "변경된 수집 근거", 4)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("파기");
+        assertThatThrownBy(() -> service.changeStatus(id, ACTOR_ID, RecipientStatus.ACTIVE, 4))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("파기");
+    }
+
     private String decrypt(RecipientStoredRecord stored, String field, byte[] value) {
         return cipher.decrypt(new PersonalDataContext("RECIPIENT",
                         stored.recipientId(), stored.organizationUnitId(), field),

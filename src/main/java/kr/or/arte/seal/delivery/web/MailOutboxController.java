@@ -31,9 +31,9 @@ public class MailOutboxController {
     @GetMapping("/admin/mail-outbox")
     @PreAuthorize("hasAuthority('MAIL_VIEW')")
     public String list(@RequestParam(required = false) MailOutboxStatus status,
-            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+            @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("mailItems", query.search(principal.adminUserId(), status));
+        var pageResult=query.searchPage(principal.adminUserId(),status,page,20); model.addAttribute("mailItems",pageResult.items()); model.addAttribute("pageResult",pageResult);
         model.addAttribute("selectedStatus", status);
         model.addAttribute("mailEnabled", mailProperties.enabled());
         return "admin/mail/list";
@@ -56,7 +56,7 @@ public class MailOutboxController {
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Referrer-Policy", "no-referrer");
         response.setHeader("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
-        return query.require(principal.adminUserId(), outboxId).html();
+        return MailPreviewSanitizer.sanitize(query.require(principal.adminUserId(), outboxId).html());
     }
 
     @PostMapping("/admin/mail-outbox/{outboxId}/retry")

@@ -30,10 +30,10 @@ public class RetentionJobController {
     @GetMapping
     @PreAuthorize("hasAuthority('RETENTION_VIEW')")
     public String list(@RequestParam(required = false) RetentionJobStatus status,
-                       @AuthenticationPrincipal AdminPrincipal principal,
+                       @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal,
                        Model model) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("items", service.search(principal.adminUserId(), status));
+        var pageResult=service.searchPage(principal.adminUserId(),status,page,20); model.addAttribute("items",pageResult.items()); model.addAttribute("pageResult",pageResult);
         model.addAttribute("activeHolds", service.activeLegalHolds(principal.adminUserId()));
         model.addAttribute("selectedStatus", status);
         return "admin/retention/list";

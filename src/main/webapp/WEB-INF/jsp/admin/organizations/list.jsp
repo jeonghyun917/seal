@@ -9,23 +9,11 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css">
 </head>
-<body class="admin-body">
-<header class="admin-header">
-    <a class="admin-brand" href="${pageContext.request.contextPath}/admin"><span>ARTE</span><strong>개인정보 전자동의·증적 관리시스템</strong></a>
-    <div class="user-actions"><span><strong><c:out value="${administrator.displayName()}"/></strong> 님</span></div>
-</header>
-<div class="admin-layout">
-    <nav class="admin-nav" aria-label="관리자 주 메뉴">
-        <a href="${pageContext.request.contextPath}/admin">대시보드</a>
-        <span class="nav-group">기준정보</span>
-        <a class="active" aria-current="page" href="${pageContext.request.contextPath}/admin/organizations">조직 관리</a>
-        <a href="${pageContext.request.contextPath}/admin/retention-policies">보유정책</a>
-        <a href="${pageContext.request.contextPath}/admin/processing-activities">처리업무</a>
-        <span class="nav-group">시스템 관리</span>
-        <a href="${pageContext.request.contextPath}/admin/users">관리자·권한</a>
-        <a href="${pageContext.request.contextPath}/admin/audit-events">감사 이력</a>
-    </nav>
-    <main class="admin-main">
+<body class="admin-body"><jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
+
+
+
+    <div class="admin-layout"><jsp:include page="/WEB-INF/jsp/fragments/admin/sidebar.jsp"/><main class="admin-main">
         <div class="page-heading-row">
             <div><p class="section-kicker">ORGANIZATION</p><h1>조직 관리</h1><p>접근 가능한 조직과 활성 상태를 조회합니다.</p></div><a class="primary-button" href="${pageContext.request.contextPath}/admin/organizations/new">조직 등록</a>
         </div>
@@ -48,7 +36,5 @@
                 </table>
             </div>
         </section>
-    </main>
-</div>
-</body>
+    </main></div></body>
 </html>

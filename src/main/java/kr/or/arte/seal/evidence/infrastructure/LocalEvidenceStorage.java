@@ -25,6 +25,7 @@ public final class LocalEvidenceStorage {
         Path parent = safeResolve(organizationId.toString(), requestId.toString());
         Path target = parent.resolve(packageId.toString()).normalize();
         Path temporary = parent.resolve(".tmp-" + UUID.randomUUID()).normalize();
+        if (Files.exists(target)) return requireIdentical(target, files);
         try {
             Files.createDirectories(temporary);
             for (var entry : files.entrySet()) {
@@ -67,6 +68,78 @@ public final class LocalEvidenceStorage {
     public int deleteDirectory(String relativePath) {
         Path target=resolveRelative(relativePath);if(target.equals(root))throw new IllegalArgumentException("증적 루트는 삭제할 수 없습니다.");
         if(!Files.exists(target))return 0;try{var paths=Files.walk(target).sorted(Comparator.reverseOrder()).toList();int files=(int)paths.stream().filter(Files::isRegularFile).count();for(Path path:paths)Files.deleteIfExists(path);return files;}catch(Exception e){throw new IllegalStateException("증적 파일을 삭제할 수 없습니다.",e);}
+    }
+
+    public QuarantinedEvidence quarantine(UUID jobId, String relativePath) {
+        if (jobId == null) throw new IllegalArgumentException("파기 작업 ID가 필요합니다.");
+        Path source = resolveRelative(relativePath);
+        String stableName = UUID.nameUUIDFromBytes(relativePath.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        String quarantinePath = ".quarantine/" + jobId + "/" + stableName;
+        Path target = resolveRelative(quarantinePath);
+        try {
+            if (Files.exists(target)) {
+                return new QuarantinedEvidence(relativePath, quarantinePath, countFiles(target));
+            }
+            if (!Files.exists(source)) {
+                return new QuarantinedEvidence(relativePath, quarantinePath, 0);
+            }
+            Files.createDirectories(target.getParent());
+            try {
+                Files.move(source, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(source, target);
+            }
+            return new QuarantinedEvidence(relativePath, quarantinePath, countFiles(target));
+        } catch (RuntimeException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException("증적 파일을 격리할 수 없습니다.", exception);
+        }
+    }
+
+    public int purgeQuarantine(String quarantinePath) {
+        if (quarantinePath == null || !quarantinePath.startsWith(".quarantine/")) {
+            throw new IllegalArgumentException("격리 경로가 올바르지 않습니다.");
+        }
+        return deleteDirectory(quarantinePath);
+    }
+
+    public int purgeJobQuarantine(UUID jobId) {
+        if (jobId == null) throw new IllegalArgumentException("파기 작업 ID가 필요합니다.");
+        return purgeQuarantine(".quarantine/" + jobId);
+    }
+
+    private static Path requireIdentical(Path target, Map<String, byte[]> expected) {
+        try (var entries = Files.list(target)) {
+            var existing = entries.toList();
+            boolean identical = existing.size() == expected.size()
+                    && existing.stream().allMatch(Files::isRegularFile);
+            if (identical) {
+                for (var entry : expected.entrySet()) {
+                    Path file = target.resolve(entry.getKey()).normalize();
+                    if (!file.getParent().equals(target)
+                            || !Files.exists(file)
+                            || !java.security.MessageDigest.isEqual(Files.readAllBytes(file), entry.getValue())) {
+                        identical = false;
+                        break;
+                    }
+                }
+            }
+            if (!identical) throw new IllegalStateException("같은 증적 패키지 경로에 다른 내용이 이미 있습니다.");
+            return target;
+        } catch (RuntimeException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException("기존 증적 패키지를 확인할 수 없습니다.", exception);
+        }
+    }
+    private static int countFiles(Path target) {
+        if (!Files.exists(target)) return 0;
+        try (var paths = Files.walk(target)) {
+            return (int) paths.filter(Files::isRegularFile).count();
+        } catch (Exception exception) {
+            throw new IllegalStateException("격리 파일 수를 확인할 수 없습니다.", exception);
+        }
     }
 
     private Path safeResolve(String... parts) {

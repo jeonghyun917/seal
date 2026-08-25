@@ -61,8 +61,10 @@ Phase 6 증적·권리요청·보유기간 수명주기는 다음 패치를 순�
 1. `database/03_patch/20260824_005_create_evidence_rights_retention_tables.sql`
 2. `database/03_patch/20260824_006_backfill_evidence_queue.sql`
 3. `database/03_patch/20260824_007_add_residual_destruction.sql`
+4. `database/03_patch/20260825_008_harden_rights_scope_integrity.sql`
+5. `database/03_patch/20260825_009_add_crypto_key_versions.sql`
 
-`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 패치 전에 이미 완료된 응답의 요청 완료시각을 보완하고 증적 큐를 멱등하게 생성한다. `007`은 완료 공개 세션 흐름값과 종료 권리요청 암호화 메모를 파기하고 결과 건수를 기록할 수 있도록 수명주기 제약을 보강한다. 각 파일은 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 SQL을 수정해 재사용하지 않는다.
+`005`는 증적·검증·권리요청·철회·기산일·보존 보류·파기 작업 테이블과 13개 권한 코드를 추가한다. `006`은 기존 완료 응답의 증적 큐를 보완하고, `007`은 잔여정보 파기 제약을 보강한다. `008`은 권리요청·긴급 파기의 조직 범위와 복합 참조 무결성을 강제하고, `009`는 권리요청 암호문과 증적 HMAC의 키 ID를 저장한다. 각 파일은 별도 SHA-256을 계산해 순서대로 적용하며, 이미 적용된 SQL을 수정해 재사용하지 않는다.
 
 각 파일은 PostgreSQL 관리자가 실행하지만 트랜잭션 안에서 `SET LOCAL ROLE seal_owner`를 사용하므로 생성 객체의 소유자는 `seal_owner`가 된다.
 

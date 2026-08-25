@@ -124,7 +124,7 @@
         FROM seal.consent_request request JOIN visible_scope scope
           ON scope.organization_unit_id = request.organization_unit_id
         <where><if test="status != null">request.request_status = #{status}</if></where>
-        ORDER BY request.created_at DESC, request.consent_request_id LIMIT 100
+        ORDER BY request.created_at DESC, request.consent_request_id LIMIT #{limit} OFFSET #{offset}
     </select>
     <select id="findDueForUpdate" resultMap="requestRecord">
         SELECT <include refid="columns"/> FROM seal.consent_request request

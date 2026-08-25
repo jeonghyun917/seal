@@ -6,4 +6,4 @@ import java.util.UUID;
 
 public record EvidenceWorkItem(UUID packageId, UUID responseId, UUID requestId, UUID organizationId,
         String title, String snapshotJson, Instant submittedAt, List<String> decisions,
-        List<String> events, int attemptCount) { }
+        List<String> events, int attemptCount, long rowVersion) { }

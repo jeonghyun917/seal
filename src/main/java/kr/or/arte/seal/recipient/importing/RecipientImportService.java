@@ -43,7 +43,8 @@ public class RecipientImportService {
                         PersonalDataMasker.name(source.name()),safeMaskedEmail(source.normalizedEmail()),
                         RecipientImportRowStatus.ERROR,String.join(",",source.errors()),null)); error++; continue;
             }
-            String hmac=hasher.hmac(source.normalizedEmail()); boolean dup=!seen.add(hmac)||repository.activeEmailExists(orgId,hmac);
+            String hmac=hasher.hmac(source.normalizedEmail()); boolean dup=!seen.add(hmac)
+                    ||hasher.candidates(source.normalizedEmail()).stream().anyMatch(candidate->repository.activeEmailExists(orgId,candidate));
             EncryptedValue name=cipher.encrypt(context(batchId,orgId,source.rowNumber(),"name"),source.name());
             EncryptedValue email=cipher.encrypt(context(batchId,orgId,source.rowNumber(),"email"),source.normalizedEmail());
             RecipientImportRowStatus status=dup?RecipientImportRowStatus.DUPLICATE:RecipientImportRowStatus.VALID;

@@ -7,8 +7,11 @@ import kr.or.arte.seal.retention.domain.RetentionAnchorType;
 import kr.or.arte.seal.retention.domain.RetentionJobStatus;
 import kr.or.arte.seal.retention.domain.RetentionJobTransition;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.file.Path;
 import java.time.Clock;
@@ -20,6 +23,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.UUID;
 
+import java.util.function.Supplier;
 @Service
 public class RetentionJobService implements RetentionJobRequestPort {
     private final RetentionRepository repository;
@@ -27,6 +31,7 @@ public class RetentionJobService implements RetentionJobRequestPort {
     private final Clock clock;
     private final AuditEventWriter audit;
 
+    private TransactionTemplate transactions;
     public RetentionJobService(RetentionRepository repository,
                                @Value("${seal.evidence.root}") String root,
                                Clock clock,
@@ -37,9 +42,17 @@ public class RetentionJobService implements RetentionJobRequestPort {
         this.audit = audit;
     }
 
+
+    @Autowired
+    public void configureTransactionManager(PlatformTransactionManager manager) {
+        this.transactions = new TransactionTemplate(manager);
+    }
     public UUID requestUrgent(UUID rights, UUID request, UUID recipient, UUID actor, Instant now) {
         if (request == null) throw new IllegalArgumentException("삭제 요청에는 동의요청 연결이 필요합니다.");
-        return repository.requestUrgent(UUID.randomUUID(), rights, request, recipient, actor, now);
+        UUID jobId = repository.requestUrgent(UUID.randomUUID(), rights, request, recipient, actor, now);
+        audit.append(audit(now, actor, "RETENTION_URGENT_REQUEST", "RETENTION_JOB", jobId,
+                Map.of("rightsRequestId", rights.toString())));
+        return jobId;
     }
 
     public boolean isConfirmed(UUID jobId, UUID actor) {
@@ -49,6 +62,8 @@ public class RetentionJobService implements RetentionJobRequestPort {
     public void placeRestrictionHold(UUID request, UUID actor, Instant now) {
         if (request == null) throw new IllegalArgumentException("처리제한에는 동의요청 연결이 필요합니다.");
         repository.placeRestrictionHold(UUID.randomUUID(), request, actor, now);
+        audit.append(audit(now, actor, "RETENTION_RESTRICTION_HOLD", "CONSENT_REQUEST", request,
+                Map.of()));
     }
 
     @Transactional
@@ -94,6 +109,13 @@ public class RetentionJobService implements RetentionJobRequestPort {
         return repository.search(actor, status);
     }
 
+    public kr.or.arte.seal.common.web.AdminPageResult<RetentionJobSummary> searchPage(UUID actor,
+            RetentionJobStatus status,int page,int size){
+        int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
+        return kr.or.arte.seal.common.web.AdminPageResult.of(
+                repository.search(actor,status,safeSize+1,offset),safePage,safeSize);
+    }
+
     public RetentionJobRecord require(UUID actor, UUID id) {
         return repository.findScoped(actor, id)
                 .orElseThrow(() -> new NoSuchElementException("파기 작업을 찾을 수 없습니다."));
@@ -112,28 +134,60 @@ public class RetentionJobService implements RetentionJobRequestPort {
         moveLocked(record, actor, RetentionJobStatus.APPROVED, null, null);
     }
 
-    @Transactional
     public RetentionExecutionResult execute(UUID actor, UUID id, UUID key) {
-        var record = lock(actor, id);
+        Objects.requireNonNull(key, "파기 실행 멱등키가 필요합니다.");
+        RetentionJobRecord record = inTransaction(() -> lock(actor, id));
         if (record.status() == RetentionJobStatus.EXECUTED || record.status() == RetentionJobStatus.CONFIRMED) {
             if (Objects.equals(key, record.idempotencyKey())) {
-                return new RetentionExecutionResult(record.destroyedMailCount(), record.destroyedFileCount(),
-                        record.destroyedSessionCount(), record.destroyedRightsCount(), record.recipientPiiDestroyed());
+                storage.purgeJobQuarantine(id);
+                return resultOf(record);
             }
             throw new IllegalStateException("이미 다른 멱등키로 실행된 작업입니다.");
         }
-        RetentionJobTransition.next(record.status(), RetentionJobStatus.EXECUTING);
-        repository.transition(id, record.status(), RetentionJobStatus.EXECUTING, actor, key, null,
-                clock.instant(), record.rowVersion());
+        inTransaction(() -> {
+            RetentionJobRecord current = lock(actor, id);
+            if (current.status() == RetentionJobStatus.APPROVED) {
+                RetentionJobTransition.next(current.status(), RetentionJobStatus.EXECUTING);
+                repository.transition(id, current.status(), RetentionJobStatus.EXECUTING, actor, key, null,
+                        clock.instant(), current.rowVersion());
+                repository.event(id, current.status(), RetentionJobStatus.EXECUTING, actor, null, clock.instant());
+            } else if (current.status() != RetentionJobStatus.EXECUTING
+                    || !Objects.equals(key, current.idempotencyKey())) {
+                throw new IllegalStateException("이미 다른 실행이 진행 중이거나 실행할 수 없는 상태입니다.");
+            }
+            return null;
+        });
+        record = inTransaction(() -> lock(actor, id));
+        RetentionJobRecord executing = record;
+        List<String> paths = inTransaction(() -> repository.evidencePaths(executing.consentRequestId()));
         int files = 0;
-        for (String path : repository.evidencePaths(record.consentRequestId())) {
-            files += storage.deleteDirectory(path);
+        for (String path : paths) {
+            files += storage.quarantine(id, path).fileCount();
         }
-        RetentionExecutionResult result = repository.destroyPrimaryData(id, record.consentRequestId(),
-                record.recipientId(), files, clock.instant());
-        repository.transition(id, RetentionJobStatus.EXECUTING, RetentionJobStatus.EXECUTED, actor, key,
-                result, clock.instant(), record.rowVersion() + 1);
-        repository.event(id, record.status(), RetentionJobStatus.EXECUTED, actor, null, clock.instant());
+        int quarantinedFiles = files;
+        RetentionExecutionResult result = inTransaction(() -> {
+            RetentionJobRecord current = lock(actor, id);
+            if (current.status() == RetentionJobStatus.EXECUTED || current.status() == RetentionJobStatus.CONFIRMED) {
+                if (!Objects.equals(key, current.idempotencyKey())) {
+                    throw new IllegalStateException("이미 다른 멱등키로 실행된 작업입니다.");
+                }
+                return resultOf(current);
+            }
+            if (current.status() != RetentionJobStatus.EXECUTING
+                    || !Objects.equals(key, current.idempotencyKey())) {
+                throw new IllegalStateException("파기 실행 상태가 일치하지 않습니다.");
+            }
+            RetentionExecutionResult destroyed = repository.destroyPrimaryData(id, current.consentRequestId(),
+                    current.recipientId(), quarantinedFiles, clock.instant());
+            repository.transition(id, RetentionJobStatus.EXECUTING, RetentionJobStatus.EXECUTED, actor, key,
+                    destroyed, clock.instant(), current.rowVersion());
+            repository.event(id, RetentionJobStatus.EXECUTING, RetentionJobStatus.EXECUTED,
+                    actor, null, clock.instant());
+            return destroyed;
+        });
+        storage.purgeJobQuarantine(id);
+        audit.append(audit(clock.instant(), actor, "RETENTION_JOB_EXECUTE", "RETENTION_JOB", id,
+                Map.of("destroyedFiles", result.fileCount(), "recipientPiiDestroyed", result.recipientPiiDestroyed())));
         return result;
     }
 
@@ -141,6 +195,8 @@ public class RetentionJobService implements RetentionJobRequestPort {
     public void confirm(UUID actor, UUID id) {
         var record = lock(actor, id);
         RetentionJobTransition.requireDifferent(record.executedBy(), actor, "CONFIRMER");
+        RetentionJobTransition.next(record.status(), RetentionJobStatus.CONFIRMED);
+        storage.purgeJobQuarantine(id);
         moveLocked(record, actor, RetentionJobStatus.CONFIRMED, null, null);
     }
 
@@ -154,11 +210,23 @@ public class RetentionJobService implements RetentionJobRequestPort {
         repository.transition(record.id(), record.status(), changed, actor, key, result, clock.instant(),
                 record.rowVersion());
         repository.event(record.id(), record.status(), changed, actor, null, clock.instant());
+        audit.append(audit(clock.instant(), actor, "RETENTION_JOB_" + changed.name(), "RETENTION_JOB",
+                record.id(), Map.of("status", changed.name())));
     }
 
     private RetentionJobRecord lock(UUID actor, UUID id) {
         return repository.findScopedForUpdate(actor, id)
                 .orElseThrow(() -> new NoSuchElementException("파기 작업을 찾을 수 없습니다."));
+
+    }
+    private <T> T inTransaction(Supplier<T> work) {
+        if (transactions == null) return work.get();
+        return transactions.execute(status -> work.get());
+    }
+
+    private static RetentionExecutionResult resultOf(RetentionJobRecord record) {
+        return new RetentionExecutionResult(record.destroyedMailCount(), record.destroyedFileCount(),
+                record.destroyedSessionCount(), record.destroyedRightsCount(), record.recipientPiiDestroyed());
     }
 
     private static String requireText(String value, String message, int max) {

@@ -14,7 +14,7 @@ import kr.or.arte.seal.request.application.CreateConsentRequestCommand;
 import kr.or.arte.seal.request.application.UpdateConsentRequestCommand;
 import kr.or.arte.seal.request.domain.ConsentRequestStatus;
 import kr.or.arte.seal.template.application.PublishedConsentTemplateQuery;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.beans.factory.annotation.Value; import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -39,19 +38,19 @@ public class ConsentRequestController {
     private final SecureLinkManagementService links;
     private final ConsentDeliveryService delivery;
     private final RecipientQueryService recipients;
-    private final PublishedConsentTemplateQuery templates;
+    private final PublishedConsentTemplateQuery templates; private final String publicBaseUrl;
 
     public ConsentRequestController(ConsentRequestManagement management, ConsentRequestQueryService query,
             SecureLinkManagementService links, ConsentDeliveryService delivery, RecipientQueryService recipients,
-            PublishedConsentTemplateQuery templates) {
+            PublishedConsentTemplateQuery templates, @Value("${seal.public-base-url}") String publicBaseUrl) {
         this.management=management; this.query=query; this.links=links; this.delivery=delivery;
-        this.recipients=recipients; this.templates=templates;
+        this.recipients=recipients; this.templates=templates; this.publicBaseUrl=normalizeBaseUrl(publicBaseUrl);
     }
 
     @GetMapping("/admin/requests") @PreAuthorize("hasAuthority('CONSENT_REQUEST_VIEW')")
     public String list(@RequestParam(required=false) ConsentRequestStatus status,
-            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
-        base(principal, model); model.addAttribute("requests", query.search(principal.adminUserId(), status));
+            @RequestParam(defaultValue="1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+        base(principal, model); var pageResult=query.searchPage(principal.adminUserId(),status,page,20); model.addAttribute("requests",pageResult.items()); model.addAttribute("pageResult",pageResult);
         model.addAttribute("selectedStatus", status); return "admin/requests/list";
     }
 
@@ -145,7 +144,7 @@ public class ConsentRequestController {
             @RequestParam(required = false) String scheduledAt,
             @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
         var result = delivery.activateAndQueue(principal.adminUserId(), requestId, versionNo,
-                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString(), parseSchedule(scheduledAt));
+                publicBaseUrl, parseSchedule(scheduledAt));
         flash(redirect, result);
         return "redirect:/admin/requests/" + requestId + "/issued-link";
     }
@@ -156,7 +155,7 @@ public class ConsentRequestController {
             @RequestParam(required = false) String scheduledAt,
             @AuthenticationPrincipal AdminPrincipal principal, RedirectAttributes redirect) {
         var result = delivery.reissueAndQueue(principal.adminUserId(), requestId, versionNo,
-                ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString(), parseSchedule(scheduledAt));
+                publicBaseUrl, parseSchedule(scheduledAt));
         flash(redirect, result);
         return "redirect:/admin/requests/" + requestId + "/issued-link";
     }
@@ -179,6 +178,15 @@ public class ConsentRequestController {
         r.addFlashAttribute("issuedLink", result.issuedLink());
         r.addFlashAttribute("outboxId", result.outboxId());
         r.addFlashAttribute("mailStatus", result.mailStatus());
+    }
+    private static String normalizeBaseUrl(String value) {
+        if (value == null || value.isBlank()) throw new IllegalStateException("공개 동의 기본 URL이 필요합니다.");
+        String normalized = value.strip();
+        java.net.URI uri = java.net.URI.create(normalized);
+        if (uri.getHost() == null || !("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))
+                || uri.getUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null)
+            throw new IllegalStateException("공개 동의 기본 URL 형식이 올바르지 않습니다.");
+        return normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
     }
     private static java.time.Instant parseSchedule(String value){
         if(value==null||value.isBlank())return null;

@@ -16,5 +16,5 @@ public interface RecipientRepository {
     Optional<RecipientStoredRecord> findScoped(UUID actorId, UUID recipientId);
     boolean update(RecipientStoredRecord record, UUID actorId, Instant now, long expectedVersion);
     List<RecipientStoredRecord> searchScoped(UUID actorId, String emailLookupHmac,
-                                             RecipientStatus status);
+                                             RecipientStatus status); default List<RecipientStoredRecord> searchScoped(UUID actorId,String emailLookupHmac,RecipientStatus status,int limit,int offset){return searchScoped(actorId,emailLookupHmac,status).stream().skip(offset).limit(limit).toList();}
 }

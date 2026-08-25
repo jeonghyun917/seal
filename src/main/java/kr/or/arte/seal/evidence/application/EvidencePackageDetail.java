@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record EvidencePackageDetail(UUID packageId, UUID requestId, EvidenceGenerationStatus status,
-        String relativePath, String manifestSha256, String manifestHmac, Instant queuedAt,
-        Instant finalizedAt, String lastErrorCode, List<EvidenceFileMetadata> files) {
+        String relativePath, String manifestSha256, String manifestHmac, String hmacKeyId,
+        Instant queuedAt, Instant finalizedAt, String lastErrorCode, List<EvidenceFileMetadata> files) {
     public EvidencePackageDetail { files = files == null ? List.of() : List.copyOf(files); }
 }

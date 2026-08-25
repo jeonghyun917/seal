@@ -30,7 +30,7 @@ public class PersonalDataProtectionConfiguration {
     @Bean
     EmailLookupHasher emailLookupHasher(PersonalDataProtectionProperties properties,
                                         PersonalDataKeyLoader loader) {
-        return new HmacEmailLookupHasher(loader.loadHmacKey(
-                properties.emailIndexHmacKeyFile()));
+        return new HmacEmailLookupHasher(new HmacKeyringLoader().load(
+                properties.emailIndexHmacKeyFile(), properties.emailIndexHmacActiveKeyId()));
     }
 }

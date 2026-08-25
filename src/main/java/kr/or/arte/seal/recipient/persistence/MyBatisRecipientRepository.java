@@ -46,6 +46,7 @@ public class MyBatisRecipientRepository implements RecipientRepository {
     @Override
     public List<RecipientStoredRecord> searchScoped(UUID actorId, String emailLookupHmac,
                                                     RecipientStatus status) {
-        return mapper.searchScoped(actorId, emailLookupHmac, status);
+        return mapper.searchScoped(actorId, emailLookupHmac, status, 100, 0);
     }
+    public List<RecipientStoredRecord> searchScoped(UUID actorId,String hmac,RecipientStatus status,int limit,int offset){return mapper.searchScoped(actorId,hmac,status,limit,offset);}
 }

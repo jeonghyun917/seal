@@ -3,6 +3,7 @@ package kr.or.arte.seal.recipient.web;
 import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
+import kr.or.arte.seal.common.web.AdminPageResult;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.recipient.application.RecipientManagementService;
 import kr.or.arte.seal.recipient.application.RecipientQueryService;
@@ -48,6 +49,8 @@ class RecipientControllerTest {
 
     @Test
     void permittedAdministratorCanOpenList() throws Exception {
+        given(query.searchPage(any(), any(), any(), any(Integer.class), any(Integer.class)))
+                .willReturn(AdminPageResult.of(java.util.List.of(), 1, 20));
         mockMvc.perform(get("/admin/recipients").with(authentication(admin("RECIPIENT_VIEW"))))
                 .andExpect(status().isOk()).andExpect(view().name("admin/recipients/list"))
                 .andExpect(model().attributeExists("recipients", "administrator"));

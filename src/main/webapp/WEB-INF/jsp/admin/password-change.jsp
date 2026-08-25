@@ -14,7 +14,7 @@
         <div class="card-heading">
             <p class="section-kicker">ACCOUNT SECURITY</p>
             <h1 id="change-title">비밀번호 변경</h1>
-            <p>${administrator.displayName()}님, 관리자 기능을 사용하기 전에 임시 비밀번호를 변경해 주세요.</p>
+            <p><c:out value="${administrator.displayName()}"/>님, 관리자 기능을 사용하기 전에 임시 비밀번호를 변경해 주세요.</p>
         </div>
 
         <div class="policy-note">

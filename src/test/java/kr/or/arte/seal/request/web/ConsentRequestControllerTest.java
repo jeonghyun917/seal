@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ConsentRequestController.class)
+@WebMvcTest(value = ConsentRequestController.class, properties = "seal.public-base-url=https://consent.arte.or.kr")
 @Import(SecurityConfig.class)
 class ConsentRequestControllerTest {
     private static final UUID REQUEST = UUID.randomUUID();
@@ -53,6 +53,21 @@ class ConsentRequestControllerTest {
                         .with(csrf()).with(authentication(admin("CONSENT_REQUEST_ACTIVATE"))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/requests/" + REQUEST + "/issued-link"));
+    }
+
+    @Test
+    void deliveryUsesConfiguredPublicBaseUrlInsteadOfRequestHost() throws Exception {
+        given(delivery.activateAndQueue(any(), eq(REQUEST), anyLong(), any(), any()))
+                .willReturn(new kr.or.arte.seal.delivery.application.DeliveryIssueResult(UUID.randomUUID(),
+                        new IssuedSecureLink("opaque-token", Instant.parse("2026-08-25T00:00:00Z")),
+                        kr.or.arte.seal.delivery.application.MailOutboxStatus.QUEUED));
+
+        mvc.perform(post("/admin/requests/{id}/deliver", REQUEST).param("versionNo", "1")
+                        .header("Host", "malicious.example").with(csrf()).with(authentication(admin("MAIL_SEND"))))
+                .andExpect(status().is3xxRedirection());
+
+        org.mockito.BDDMockito.then(delivery).should().activateAndQueue(any(), eq(REQUEST), anyLong(),
+                eq("https://consent.arte.or.kr"), any());
     }
 
     private static UsernamePasswordAuthenticationToken admin(String authority) {

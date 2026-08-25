@@ -1,0 +1,129 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: postgres
+      SEAL_DB_URL: jdbc:postgresql://localhost:5432/seal_dev?currentSchema=seal
+      SEAL_DB_USERNAME: seal_app
+      SEAL_DB_PASSWORD: seal_ci_password
+      SEAL_DATA_ACTIVE_KEY_ID: v1
+      SEAL_DATA_KEYS_FILE: ${{ github.workspace }}/target/ci-keys/data.keys
+      SEAL_EMAIL_INDEX_HMAC_KEY_FILE: ${{ github.workspace }}/target/ci-keys/email-index.keys
+      SEAL_EMAIL_INDEX_HMAC_ACTIVE_KEY_ID: v1
+      SEAL_LINK_HMAC_KEY_FILE: ${{ github.workspace }}/target/ci-keys/link.keys
+      SEAL_LINK_HMAC_ACTIVE_KEY_ID: v1
+      SEAL_EVIDENCE_HMAC_KEY_FILE: ${{ github.workspace }}/target/ci-keys/evidence.keys
+      SEAL_EVIDENCE_HMAC_ACTIVE_KEY_ID: v1
+      SEAL_EVIDENCE_ROOT: ${{ github.workspace }}/target/ci-evidence
+      SEAL_MAIL_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Check whitespace
+        run: git show --check --oneline --no-renames HEAD
+
+      - name: Create database roles
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE seal_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE seal_app LOGIN PASSWORD 'seal_ci_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          createdb -h localhost -U postgres -O seal_owner -E UTF8 -T template0 seal_dev
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "REVOKE ALL ON DATABASE seal_dev FROM PUBLIC"
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 -c "GRANT CONNECT ON DATABASE seal_dev TO seal_app"
+
+      - name: Apply manual SQL history
+        run: |
+          set -euo pipefail
+          apply_sql() {
+            file="$1"
+            checksum="$(sha256sum "$file" | cut -d ' ' -f 1)"
+            psql -h localhost -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+              -v target_database=seal_dev -v script_checksum="$checksum" \
+              -v app_version=ci -f "$file"
+          }
+          apply_sql database/01_schema/001_create_schema.sql
+          apply_sql database/01_schema/002_create_core_tables.sql
+          apply_sql database/02_data/001_common_codes.sql
+          for file in database/03_patch/20*.sql; do apply_sql "$file"; done
+
+      - name: Verify database contract
+        run: |
+          set -euo pipefail
+          checksum() { sha256sum "$1" | cut -d ' ' -f 1; }
+          for file in database/04_verify/*.sql; do
+            case "$(basename "$file")" in
+              007_*) source=database/03_patch/20260824_003_create_recipient_request_tables.sql ;;
+              008_*) source=database/03_patch/20260824_004_create_import_consent_delivery_tables.sql ;;
+              009_*) source=database/03_patch/20260824_005_create_evidence_rights_retention_tables.sql ;;
+              011_*) source=database/03_patch/20260824_007_add_residual_destruction.sql ;;
+              012_*) source=database/03_patch/20260825_008_harden_rights_scope_integrity.sql ;;
+              013_*) source=database/03_patch/20260825_009_add_crypto_key_versions.sql ;;
+              *) source="$file" ;;
+            esac
+            psql -h localhost -U postgres -d postgres -X -v ON_ERROR_STOP=1 \
+              -v target_database=seal_dev -v expected_checksum="$(checksum "$source")" -f "$file"
+          done
+
+      - name: Seed integration-test administrators
+        run: |
+          psql -h localhost -U postgres -d seal_dev -X -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE seal_owner;
+          SET search_path = seal, public;
+          INSERT INTO admin_user(admin_user_id,login_id,display_name,organization_unit_id,password_hash,must_change_password)
+          VALUES
+            ('10000000-0000-0000-0000-000000000001','seal-admin','CI 시스템 관리자','00000000-0000-0000-0000-000000000001','$2a$12$012345678901234567890uMZL1wKzWZP3tJYJYw1W02fhfQOlqQxK',FALSE),
+            ('10000000-0000-0000-0000-000000000002','vheraclesv','CI 승인 관리자','00000000-0000-0000-0000-000000000001','$2a$12$012345678901234567890uMZL1wKzWZP3tJYJYw1W02fhfQOlqQxK',FALSE);
+          INSERT INTO user_role(admin_user_id,role_id,assigned_by)
+          SELECT u.admin_user_id,'00000000-0000-0000-0001-000000000001',u.admin_user_id
+          FROM admin_user u WHERE u.login_id IN ('seal-admin','vheraclesv');
+          INSERT INTO user_scope(user_scope_id,admin_user_id,scope_type,scope_target_id,include_descendants,assigned_by)
+          SELECT gen_random_uuid(),u.admin_user_id,'ORGANIZATION','00000000-0000-0000-0000-000000000001',TRUE,u.admin_user_id
+          FROM admin_user u WHERE u.login_id IN ('seal-admin','vheraclesv');
+          SQL
+
+      - name: Create ephemeral test keys
+        run: |
+          mkdir -p target/ci-keys target/ci-evidence
+          key="$(openssl rand -base64 32 | tr -d '\n')"
+          printf 'v1=%s\n' "$key" > target/ci-keys/data.keys
+          printf 'v1=%s\n' "$key" > target/ci-keys/email-index.keys
+          printf 'v1=%s\n' "$key" > target/ci-keys/link.keys
+          printf 'v1=%s\n' "$key" > target/ci-keys/evidence.keys
+          chmod 600 target/ci-keys/*
+
+      - name: Verify application
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
+
+      - name: Resolve dependency graph
+        run: ./mvnw -B -DskipTests dependency:tree

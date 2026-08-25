@@ -98,6 +98,6 @@
             <if test="status != null">AND recipient.recipient_status = #{status}</if>
         </where>
         ORDER BY recipient.created_at DESC, recipient.recipient_id
-        LIMIT 100
+        LIMIT #{limit} OFFSET #{offset}
     </select>
 </mapper>

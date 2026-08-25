@@ -69,9 +69,11 @@ management:
       show-details: never
 
 seal:
+  public-base-url: ${SEAL_PUBLIC_BASE_URL:http://127.0.0.1:9090}
   evidence:
     root: ${SEAL_EVIDENCE_ROOT:target/seal-evidence}
     hmac-key-file: ${SEAL_EVIDENCE_HMAC_KEY_FILE:}
+    hmac-active-key-id: ${SEAL_EVIDENCE_HMAC_ACTIVE_KEY_ID:v1}
     worker-enabled: ${SEAL_EVIDENCE_WORKER_ENABLED:false}
   recipient-import:
     max-rows: ${SEAL_IMPORT_MAX_ROWS:1000}
@@ -83,6 +85,7 @@ seal:
     timeout: ${SEAL_CLAMAV_TIMEOUT:5s}
   secure-link:
     hmac-key-file: ${SEAL_LINK_HMAC_KEY_FILE:}
+    active-key-id: ${SEAL_LINK_HMAC_ACTIVE_KEY_ID:v1}
   admin-security:
     max-login-failures: ${SEAL_ADMIN_MAX_LOGIN_FAILURES:5}
     temporary-lock-duration: ${SEAL_ADMIN_LOCK_DURATION:15m}
@@ -102,3 +105,4 @@ seal:
     active-key-id: ${SEAL_DATA_ACTIVE_KEY_ID:}
     keys-file: ${SEAL_DATA_KEYS_FILE:}
     email-index-hmac-key-file: ${SEAL_EMAIL_INDEX_HMAC_KEY_FILE:}
+    email-index-hmac-active-key-id: ${SEAL_EMAIL_INDEX_HMAC_ACTIVE_KEY_ID:v1}

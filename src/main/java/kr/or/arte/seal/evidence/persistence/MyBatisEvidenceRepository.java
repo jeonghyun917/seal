@@ -15,14 +15,18 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
     @Transactional public List<EvidenceWorkItem> claimDue(Instant now,int limit,Instant lease){
         return mapper.claimDue(now,limit,lease).stream().map(row->new EvidenceWorkItem(row.packageId(),row.responseId(),
                 row.requestId(),row.organizationId(),row.title(),row.snapshotJson(),row.submittedAt(),
-                mapper.decisions(row.responseId()),mapper.events(row.requestId()),row.attemptCount())).toList();
+                mapper.decisions(row.responseId()),mapper.events(row.requestId()),row.attemptCount(),row.rowVersion())).toList();
     }
-    @Transactional public void finalized(UUID id,GeneratedEvidence generated,Instant now){
-        generated.files().forEach(file->mapper.insertFile(id,file,now)); mapper.finalizePackage(id,generated,now);
+    @Transactional public void finalized(UUID id,long claimedRowVersion,GeneratedEvidence generated,Instant now){
+        if(mapper.finalizePackage(id,claimedRowVersion,generated,now)!=1){
+            throw new IllegalStateException("처리 권한을 잃어 증적 패키지를 최종화할 수 없습니다.");
+        }
+        generated.files().forEach(file->mapper.insertFile(id,file,now));
     }
-    public void failed(UUID id,String code,Instant now){mapper.fail(id,code,now);}
-    public List<EvidencePackageSummary> search(UUID actorId,EvidenceGenerationStatus status){return mapper.search(actorId,status);}
-    public Optional<EvidencePackageDetail> findScoped(UUID actorId,UUID id){return mapper.findScoped(actorId,id).map(p->new EvidencePackageDetail(p.packageId(),p.requestId(),p.status(),p.relativePath(),p.manifestSha256(),p.manifestHmac(),p.queuedAt(),p.finalizedAt(),p.lastErrorCode(),mapper.files(id)));}
+    public void failed(UUID id,long claimedRowVersion,String code,Instant now){if(mapper.fail(id,claimedRowVersion,code,now)!=1)throw new IllegalStateException("처리 권한을 잃어 증적 실패 상태를 기록할 수 없습니다.");}
+    public List<EvidencePackageSummary> search(UUID actorId,EvidenceGenerationStatus status){return mapper.search(actorId,status,100,0);}
+    public Optional<EvidencePackageDetail> findScoped(UUID actorId,UUID id){return mapper.findScoped(actorId,id).map(p->new EvidencePackageDetail(p.packageId(),p.requestId(),p.status(),p.relativePath(),p.manifestSha256(),p.manifestHmac(),p.hmacKeyId(),p.queuedAt(),p.finalizedAt(),p.lastErrorCode(),mapper.files(id)));}
     public void requeue(UUID actorId,UUID id,Instant now){if(mapper.requeue(actorId,id,now)!=1)throw new IllegalStateException("재생성할 수 없는 증적입니다.");}
     public void recordVerification(UUID packageId,UUID actorId,EvidenceVerificationResult result,Instant now){mapper.verification(UUID.randomUUID(),packageId,actorId,result,now);}
+    public List<EvidencePackageSummary> search(UUID actor,EvidenceGenerationStatus status,int limit,int offset){return mapper.search(actor,status,limit,offset);}
 }

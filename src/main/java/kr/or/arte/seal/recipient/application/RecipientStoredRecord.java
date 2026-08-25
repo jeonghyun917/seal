@@ -10,10 +10,12 @@ public record RecipientStoredRecord(UUID recipientId, UUID organizationUnitId,
                                     String collectionBasis, RecipientStatus status,
                                     long versionNo) {
     public RecipientStoredRecord {
-        nameCiphertext = nameCiphertext.clone();
-        emailCiphertext = emailCiphertext.clone();
+        nameCiphertext = copy(nameCiphertext);
+        emailCiphertext = copy(emailCiphertext);
     }
 
-    @Override public byte[] nameCiphertext() { return nameCiphertext.clone(); }
-    @Override public byte[] emailCiphertext() { return emailCiphertext.clone(); }
+    @Override public byte[] nameCiphertext() { return copy(nameCiphertext); }
+    @Override public byte[] emailCiphertext() { return copy(emailCiphertext); }
+
+    private static byte[] copy(byte[] value) { return value == null ? null : value.clone(); }
 }

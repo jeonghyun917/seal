@@ -46,7 +46,7 @@ public class RecipientManagementService {
         String email = validEmail(command.email());
         String basis = validBasis(command.collectionBasis());
         String emailHmac = hasher.hmac(EmailNormalizer.normalize(email));
-        rejectDuplicate(command.organizationUnitId(), emailHmac, null, email);
+        rejectDuplicate(command.organizationUnitId(), EmailNormalizer.normalize(email), null, email);
 
         UUID id = UUID.randomUUID();
         EncryptedValue encryptedName = cipher.encrypt(context(id, command.organizationUnitId(), "name"), name);
@@ -65,13 +65,14 @@ public class RecipientManagementService {
     public void update(UUID recipientId, UpdateRecipientCommand command) {
         RecipientStoredRecord current = repository.findScoped(command.actorId(), recipientId).orElseThrow(
                 RecipientManagementService::notFound);
+        requireNotDestroyed(current);
         String oldName = decrypt(current, "name", current.nameCiphertext());
         String oldEmail = decrypt(current, "email", current.emailCiphertext());
         String name = blank(command.name()) ? oldName : validName(command.name());
         String email = blank(command.email()) ? oldEmail : validEmail(command.email());
         String basis = validBasis(command.collectionBasis());
         String emailHmac = hasher.hmac(EmailNormalizer.normalize(email));
-        rejectDuplicate(current.organizationUnitId(), emailHmac, recipientId, email);
+        rejectDuplicate(current.organizationUnitId(), EmailNormalizer.normalize(email), recipientId, email);
 
         EncryptedValue encryptedName = cipher.encrypt(context(recipientId, current.organizationUnitId(), "name"), name);
         EncryptedValue encryptedEmail = cipher.encrypt(context(recipientId, current.organizationUnitId(), "email"), email);
@@ -86,9 +87,10 @@ public class RecipientManagementService {
     public void changeStatus(UUID recipientId, UUID actorId, RecipientStatus status, long versionNo) {
         RecipientStoredRecord current = repository.findScoped(actorId, recipientId).orElseThrow(
                 RecipientManagementService::notFound);
+        requireNotDestroyed(current);
         if (status == RecipientStatus.ACTIVE) {
             String email = decrypt(current, "email", current.emailCiphertext());
-            rejectDuplicate(current.organizationUnitId(), current.emailLookupHmac(), recipientId, email);
+            rejectDuplicate(current.organizationUnitId(), EmailNormalizer.normalize(email), recipientId, email);
         }
         RecipientStoredRecord updated = new RecipientStoredRecord(recipientId, current.organizationUnitId(),
                 current.nameCiphertext(), current.emailCiphertext(), current.encryptionKeyId(),
@@ -97,10 +99,13 @@ public class RecipientManagementService {
         audit("RECIPIENT_STATUS_CHANGE", recipientId, actorId, current.organizationUnitId(), status);
     }
 
-    private void rejectDuplicate(UUID orgId, String hmac, UUID excludedId, String email) {
-        repository.findActiveByEmailHmac(orgId, hmac, excludedId).ifPresent(existing -> {
-            throw new DuplicateRecipientException(existing.recipientId(), PersonalDataMasker.email(email));
-        });
+    private void rejectDuplicate(UUID orgId, String normalizedEmail, UUID excludedId, String email) {
+        for (String hmac : hasher.candidates(normalizedEmail)) {
+            var existing = repository.findActiveByEmailHmac(orgId, hmac, excludedId);
+            if (existing.isPresent()) {
+                throw new DuplicateRecipientException(existing.get().recipientId(), PersonalDataMasker.email(email));
+            }
+        }
     }
 
     private String decrypt(RecipientStoredRecord record, String field, byte[] value) {
@@ -108,6 +113,12 @@ public class RecipientManagementService {
                 new EncryptedValue(record.encryptionKeyId(), value));
     }
 
+
+    private static void requireNotDestroyed(RecipientStoredRecord record) {
+        if (record.status() == RecipientStatus.DESTROYED) {
+            throw new IllegalStateException("파기 완료된 대상자는 변경할 수 없습니다.");
+        }
+    }
     private void audit(String action, UUID id, UUID actorId, UUID orgId, RecipientStatus status) {
         auditWriter.append(new AuditEventCommand(clock.instant(), "ADMIN", actorId, action,
                 "RECIPIENT", id.toString(), "SUCCESS", null, UUID.randomUUID(),

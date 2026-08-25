@@ -53,7 +53,7 @@ public class MyBatisConsentRequestRepository implements ConsentRequestRepository
         requireOne(mapper.insertEvent(UUID.randomUUID(), id, type, actorType, actor, reason, now));
     }
     @Override public List<ConsentRequestRecord> searchScoped(UUID actor, ConsentRequestStatus status) {
-        return mapper.searchScoped(actor, status);
+        return mapper.searchScoped(actor, status, 100, 0);
     }
     @Override public List<ConsentRequestRecord> findDueForUpdate(Instant now, int limit) {
         return mapper.findDueForUpdate(now, limit);
@@ -67,4 +67,5 @@ public class MyBatisConsentRequestRepository implements ConsentRequestRepository
     private static void requireOne(int count) {
         if (count != 1) throw new IllegalStateException("동의 요청 저장 건수가 일치하지 않습니다.");
     }
+    public List<ConsentRequestRecord> searchScoped(UUID actor,ConsentRequestStatus status,int limit,int offset){return mapper.searchScoped(actor,status,limit,offset);}
 }

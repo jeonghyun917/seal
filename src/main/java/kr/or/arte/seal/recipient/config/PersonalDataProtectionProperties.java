@@ -8,6 +8,7 @@ import java.nio.file.Path;
 public record PersonalDataProtectionProperties(
         String activeKeyId,
         Path keysFile,
-        Path emailIndexHmacKeyFile
+        Path emailIndexHmacKeyFile,
+        String emailIndexHmacActiveKeyId
 ) {
 }

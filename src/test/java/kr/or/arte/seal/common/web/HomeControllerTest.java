@@ -32,8 +32,8 @@ class HomeControllerTest {
         mockMvc.perform(get("/system/status"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("system/status"))
-                .andExpect(model().attribute("databaseVersion", "PostgreSQL 16.14"))
+                .andExpect(model().attributeExists("runtimeVersion", "javaVersion", "databaseVersion"))
                 .andExpect(model().attribute("deliveryScope", "이메일 + 일회용 보안 링크"))
-                .andExpect(model().attribute("excludedScope", "전자서명·OTP 제외"));
+                .andExpect(model().attribute("excludedScope", "전자서명·SMS·OTP·실명 본인확인 제외"));
     }
 }

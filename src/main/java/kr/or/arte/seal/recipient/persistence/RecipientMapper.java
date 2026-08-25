@@ -24,5 +24,5 @@ public interface RecipientMapper {
                @Param("now") Instant now, @Param("expectedVersion") long expectedVersion);
     List<RecipientStoredRecord> searchScoped(@Param("actorId") UUID actorId,
                                              @Param("emailLookupHmac") String emailLookupHmac,
-                                             @Param("status") RecipientStatus status);
+                                             @Param("status") RecipientStatus status, @Param("limit") int limit, @Param("offset") int offset);
 }

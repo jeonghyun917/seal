@@ -1,5 +1,6 @@
 package kr.or.arte.seal.delivery.config;
 
+import kr.or.arte.seal.audit.application.AuditEventWriter;
 import kr.or.arte.seal.delivery.application.MailOutboxRepository;
 import kr.or.arte.seal.delivery.application.MailOutboxWorker;
 import kr.or.arte.seal.delivery.application.MailTransport;
@@ -13,10 +14,9 @@ import java.time.Clock;
 @Configuration
 @EnableConfigurationProperties(MailRelayProperties.class)
 public class MailDeliveryConfiguration {
-
     @Bean
     MailOutboxWorker mailOutboxWorker(MailOutboxRepository repository, MailTransport transport,
-            PersonalDataCipher cipher, MailRelayProperties properties, Clock clock) {
-        return new MailOutboxWorker(repository, transport, cipher, properties.enabled(), clock);
+            PersonalDataCipher cipher, MailRelayProperties properties, Clock clock, AuditEventWriter audit) {
+        return new MailOutboxWorker(repository, transport, cipher, properties.enabled(), clock, audit);
     }
 }

@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,10 +44,8 @@ public class ProcessingActivityController {
     @PostMapping("/admin/processing-activities") @PreAuthorize("hasAuthority('PROCESSING_ACTIVITY_EDIT')")
     public String create(@Valid @ModelAttribute("activityForm") ProcessingActivityForm form,
             BindingResult result, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
-        validateOptionalItem(form.getItemName2(), form.getNecessityReason2(), "itemName2", "necessityReason2", result);
-        validateOptionalItem(form.getItemName3(), form.getNecessityReason3(), "itemName3", "necessityReason3", result);
         if (result.hasErrors()) { populate(principal, model); return "admin/processing-activities/form"; }
-        UUID id = management.create(new ProcessingActivityCreateCommand(form.getActivityCode(), form.getActivityName(),
+        UUID id = management.create(new ProcessingActivityCreateCommand(form.getActivityName(),
                 form.getOwnerOrganizationUnitId(), form.getProcessingPurpose(), form.getLegalBasisType(),
                 form.getLegalBasisDetail(), form.getRetentionPolicyVersionId(), items(form), principal.adminUserId()));
         return "redirect:/admin/processing-activities/" + id + "?created";
@@ -68,8 +65,10 @@ public class ProcessingActivityController {
     @PostMapping("/admin/processing-activities/{activityId}/versions/{versionId}/reject") @PreAuthorize("hasAuthority('PROCESSING_ACTIVITY_APPROVE')")
     public String reject(@PathVariable UUID activityId, @PathVariable UUID versionId, @RequestParam String comment, @AuthenticationPrincipal AdminPrincipal principal) { management.reject(activityId, versionId, principal.adminUserId(), comment); return redirect(activityId, "rejected"); }
     private void populate(AdminPrincipal principal, Model model) { model.addAttribute("administrator", principal); model.addAttribute("organizations", organizations.findVisibleOrganizations(principal.adminUserId())); model.addAttribute("retentionPolicies", query.findApprovedRetentionPolicies(principal.adminUserId())); model.addAttribute("legalBasisTypes", LegalBasisType.values()); }
-    private static List<ProcessingDataItem> items(ProcessingActivityForm f) { List<ProcessingDataItem> result = new ArrayList<>(); result.add(new ProcessingDataItem(f.getItemName1(), f.getNecessityReason1(), f.isRequired1())); add(result,f.getItemName2(),f.getNecessityReason2(),f.isRequired2()); add(result,f.getItemName3(),f.getNecessityReason3(),f.isRequired3()); return result; }
-    private static void add(List<ProcessingDataItem> items,String name,String reason,boolean required){if(name!=null&&!name.isBlank())items.add(new ProcessingDataItem(name,reason,required));}
-    private static void validateOptionalItem(String name,String reason,String nameField,String reasonField,BindingResult result){boolean hasName=name!=null&&!name.isBlank(), hasReason=reason!=null&&!reason.isBlank(); if(hasName&&!hasReason)result.rejectValue(reasonField,"required","필요성 설명을 입력해 주세요."); if(!hasName&&hasReason)result.rejectValue(nameField,"required","항목명을 입력해 주세요.");}
+    private static List<ProcessingDataItem> items(ProcessingActivityForm form) {
+        return form.getItems().stream()
+                .map(item -> new ProcessingDataItem(item.getItemName(), item.getNecessityReason(), item.isRequired()))
+                .toList();
+    }
     private static String redirect(UUID id,String event){return "redirect:/admin/processing-activities/"+id+"?"+event;}
 }

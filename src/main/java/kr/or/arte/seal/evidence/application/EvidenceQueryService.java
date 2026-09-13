@@ -4,6 +4,7 @@ import kr.or.arte.seal.audit.application.AuditEventCommand;
 import kr.or.arte.seal.audit.application.AuditEventWriter;
 import kr.or.arte.seal.evidence.domain.EvidenceGenerationStatus;
 import kr.or.arte.seal.evidence.infrastructure.*;
+import kr.or.arte.seal.recipient.application.RecipientQueryService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -23,33 +24,48 @@ public class EvidenceQueryService {
     private final String activeKeyId;
     private final Clock clock;
     private final AuditEventWriter audit;
+    private final RecipientQueryService recipients;
 
     public EvidenceQueryService(EvidenceRepository repository, @Value("${seal.evidence.root}") String root,
             @Value("${seal.evidence.hmac-key-file:}") String keyFile,
             @Value("${seal.evidence.hmac-active-key-id:v1}") String activeKeyId,
-            Clock clock, AuditEventWriter audit) {
+            Clock clock, AuditEventWriter audit, RecipientQueryService recipients) {
         this.repository = repository;
         this.storage = new LocalEvidenceStorage(Path.of(root));
         this.keyFile = keyFile;
         this.activeKeyId = activeKeyId;
         this.clock = clock;
         this.audit = audit;
+        this.recipients = recipients;
     }
 
-    public List<EvidencePackageSummary> search(UUID actor, EvidenceGenerationStatus status) {
-        return repository.search(actor, status);
+    public List<EvidencePackageListItem> search(UUID actor, EvidenceGenerationStatus status) {
+        return repository.search(actor, status).stream().map(item -> listItem(actor, item)).toList();
     }
 
-    public kr.or.arte.seal.common.web.AdminPageResult<EvidencePackageSummary> searchPage(UUID actor,
+    public kr.or.arte.seal.common.web.AdminPageResult<EvidencePackageListItem> searchPage(UUID actor,
             EvidenceGenerationStatus status,int page,int size){
         int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
         return kr.or.arte.seal.common.web.AdminPageResult.of(
-                repository.search(actor,status,safeSize+1,offset),safePage,safeSize);
+                repository.search(actor,status,safeSize+1,offset).stream()
+                        .map(item -> listItem(actor, item)).toList(),safePage,safeSize);
+    }
+
+    private EvidencePackageListItem listItem(UUID actor, EvidencePackageSummary item) {
+        var recipient = recipients.find(actor, item.recipientId());
+        return new EvidencePackageListItem(item.packageId(), item.requestCode(), item.templateTitle(),
+                recipient.maskedName(), recipient.maskedEmail(),
+                EvidencePackageListItem.summarizeResponse(item.agreedCount(), item.decisionCount()),
+                item.status(), item.queuedAt(), item.finalizedAt(), item.attemptCount(), item.lastErrorCode());
     }
 
     public EvidencePackageDetail require(UUID actor, UUID id) {
         return repository.findScoped(actor, id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "증적을 찾을 수 없습니다."));
+    }
+
+    public java.util.Optional<EvidencePackageDetail> findByRequest(UUID actor, UUID requestId) {
+        return repository.findByRequestScoped(actor, requestId);
     }
 
     public void requeue(UUID actor, UUID id) {

@@ -14,13 +14,12 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 public class RetentionPolicyManagementService {
-    private static final Pattern CODE_PATTERN = Pattern.compile("^[A-Z0-9-]{2,30}$");
     private final RetentionPolicyMapper mapper;
     private final AuditEventWriter auditEventWriter;
     private final Clock clock;
@@ -34,16 +33,17 @@ public class RetentionPolicyManagementService {
 
     @Transactional
     public UUID create(RetentionPolicyCreateCommand command) {
-        validateIdentity(command.policyCode(), command.policyName());
+        validateName(command.policyName());
         if (!mapper.canAccessOrganization(command.actorId(), command.ownerOrganizationUnitId())) {
             throw notFound();
         }
         UUID policyId = UUID.randomUUID();
+        String policyCode = generatePolicyCode(policyId);
         UUID versionId = UUID.randomUUID();
         RetentionPolicyVersion draft = RetentionPolicyVersion.draft(versionId, policyId, 1,
                 command.startEvent(), command.periodValue(), command.periodUnit(),
                 command.gracePeriodDays(), command.destructionMethod(), command.actorId());
-        mapper.insertPolicy(new RetentionPolicyInsert(policyId, command.policyCode(),
+        mapper.insertPolicy(new RetentionPolicyInsert(policyId, policyCode,
                 command.policyName().strip(), command.ownerOrganizationUnitId(), command.actorId()));
         mapper.insertVersion(new RetentionPolicyVersionInsert(versionId, policyId, 1,
                 draft.startEvent(), draft.periodValue(), draft.periodUnit(), draft.gracePeriodDays(),
@@ -98,13 +98,14 @@ public class RetentionPolicyManagementService {
                 UUID.randomUUID(), Map.of()));
     }
 
-    private static void validateIdentity(String code, String name) {
-        if (code == null || !CODE_PATTERN.matcher(code).matches()) {
-            throw new IllegalArgumentException("정책코드는 영문 대문자, 숫자, 하이픈 2~30자로 입력해야 합니다.");
-        }
+    private static void validateName(String name) {
         if (name == null || name.isBlank() || name.strip().length() > 100) {
             throw new IllegalArgumentException("정책명은 1~100자로 입력해야 합니다.");
         }
+    }
+
+    private static String generatePolicyCode(UUID policyId) {
+        return "RP-" + policyId.toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
     }
 
     private static ResponseStatusException notFound() {

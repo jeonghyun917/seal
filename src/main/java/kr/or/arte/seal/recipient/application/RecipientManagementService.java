@@ -42,6 +42,8 @@ public class RecipientManagementService {
                 || !repository.canAccessActiveOrganization(command.actorId(), command.organizationUnitId())) {
             throw notFound();
         }
+        String affiliationName = validAffiliationName(command.affiliationName());
+        String jobTitle = validJobTitle(command.jobTitle());
         String name = validName(command.name());
         String email = validEmail(command.email());
         String basis = validBasis(command.collectionBasis());
@@ -54,7 +56,7 @@ public class RecipientManagementService {
         if (!encryptedName.keyId().equals(encryptedEmail.keyId())) {
             throw new IllegalStateException("개인정보 암호화 키 버전이 일치하지 않습니다.");
         }
-        repository.insert(new RecipientStoredRecord(id, command.organizationUnitId(),
+        repository.insert(new RecipientStoredRecord(id, command.organizationUnitId(), affiliationName, jobTitle,
                 encryptedName.bytes(), encryptedEmail.bytes(), encryptedName.keyId(), emailHmac,
                 basis, RecipientStatus.ACTIVE, 0), command.actorId(), clock.instant());
         audit("RECIPIENT_CREATE", id, command.actorId(), command.organizationUnitId(), RecipientStatus.ACTIVE);
@@ -68,6 +70,8 @@ public class RecipientManagementService {
         requireNotDestroyed(current);
         String oldName = decrypt(current, "name", current.nameCiphertext());
         String oldEmail = decrypt(current, "email", current.emailCiphertext());
+        String affiliationName = validAffiliationName(command.affiliationName());
+        String jobTitle = validJobTitle(command.jobTitle());
         String name = blank(command.name()) ? oldName : validName(command.name());
         String email = blank(command.email()) ? oldEmail : validEmail(command.email());
         String basis = validBasis(command.collectionBasis());
@@ -76,7 +80,7 @@ public class RecipientManagementService {
 
         EncryptedValue encryptedName = cipher.encrypt(context(recipientId, current.organizationUnitId(), "name"), name);
         EncryptedValue encryptedEmail = cipher.encrypt(context(recipientId, current.organizationUnitId(), "email"), email);
-        RecipientStoredRecord updated = new RecipientStoredRecord(recipientId, current.organizationUnitId(),
+        RecipientStoredRecord updated = new RecipientStoredRecord(recipientId, current.organizationUnitId(), affiliationName, jobTitle,
                 encryptedName.bytes(), encryptedEmail.bytes(), encryptedName.keyId(), emailHmac,
                 basis, current.status(), command.versionNo() + 1);
         if (!repository.update(updated, command.actorId(), clock.instant(), command.versionNo())) throw conflict();
@@ -93,7 +97,7 @@ public class RecipientManagementService {
             rejectDuplicate(current.organizationUnitId(), EmailNormalizer.normalize(email), recipientId, email);
         }
         RecipientStoredRecord updated = new RecipientStoredRecord(recipientId, current.organizationUnitId(),
-                current.nameCiphertext(), current.emailCiphertext(), current.encryptionKeyId(),
+                current.affiliationName(), current.jobTitle(), current.nameCiphertext(), current.emailCiphertext(), current.encryptionKeyId(),
                 current.emailLookupHmac(), current.collectionBasis(), status, versionNo + 1);
         if (!repository.update(updated, actorId, clock.instant(), versionNo)) throw conflict();
         audit("RECIPIENT_STATUS_CHANGE", recipientId, actorId, current.organizationUnitId(), status);
@@ -116,7 +120,7 @@ public class RecipientManagementService {
 
     private static void requireNotDestroyed(RecipientStoredRecord record) {
         if (record.status() == RecipientStatus.DESTROYED) {
-            throw new IllegalStateException("파기 완료된 대상자는 변경할 수 없습니다.");
+            throw new IllegalStateException("파기 완료된 수신자는 변경할 수 없습니다.");
         }
     }
     private void audit(String action, UUID id, UUID actorId, UUID orgId, RecipientStatus status) {
@@ -129,10 +133,22 @@ public class RecipientManagementService {
         return new PersonalDataContext("RECIPIENT", id, orgId, field);
     }
 
-    private static String validName(String value) {
-        if (blank(value)) throw new IllegalArgumentException("대상자 이름을 입력해 주세요.");
+    private static String validAffiliationName(String value) {
+        if (blank(value)) return null;
         String normalized = Normalizer.normalize(value.strip(), Normalizer.Form.NFC);
-        if (normalized.length() > 100) throw new IllegalArgumentException("대상자 이름은 100자 이하여야 합니다.");
+        if (normalized.length() > 200) throw new IllegalArgumentException("수신자 소속기관은 200자 이하여야 합니다.");
+        return normalized;
+    }
+    private static String validJobTitle(String value) {
+        if (blank(value)) return null;
+        String normalized = Normalizer.normalize(value.strip(), Normalizer.Form.NFC);
+        if (normalized.length() > 100) throw new IllegalArgumentException("수신자 직책은 100자 이하여야 합니다.");
+        return normalized;
+    }
+    private static String validName(String value) {
+        if (blank(value)) throw new IllegalArgumentException("수신자 이름을 입력해 주세요.");
+        String normalized = Normalizer.normalize(value.strip(), Normalizer.Form.NFC);
+        if (normalized.length() > 100) throw new IllegalArgumentException("수신자 이름은 100자 이하여야 합니다.");
         return normalized;
     }
 
@@ -149,7 +165,7 @@ public class RecipientManagementService {
 
     private static String validBasis(String value) {
         if (blank(value) || value.strip().length() < 5 || value.strip().length() > 500) {
-            throw new IllegalArgumentException("수집 근거는 5~500자로 입력해 주세요.");
+            throw new IllegalArgumentException("수신자 정보 등록 근거는 5~500자로 입력해 주세요.");
         }
         return value.strip();
     }

@@ -121,6 +121,11 @@ public class RetentionJobService implements RetentionJobRequestPort {
                 .orElseThrow(() -> new NoSuchElementException("파기 작업을 찾을 수 없습니다."));
     }
 
+    public RetentionActorNames actorNames(UUID actor, UUID id) {
+        return repository.findActorNamesScoped(actor, id)
+                .orElseThrow(() -> new NoSuchElementException("파기 작업을 찾을 수 없습니다."));
+    }
+
     @Transactional
     public void submit(UUID actor, UUID id) {
         move(actor, id, RetentionJobStatus.PENDING_APPROVAL, null, null);

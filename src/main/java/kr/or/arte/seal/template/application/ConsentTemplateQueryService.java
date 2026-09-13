@@ -25,6 +25,11 @@ public class ConsentTemplateQueryService {
     }
 
     @Transactional(readOnly = true)
+    public List<DeletedConsentTemplateSummary> searchDeleted(UUID actorId, String keyword) {
+        return mapper.searchDeleted(actorId, normalize(keyword));
+    }
+
+    @Transactional(readOnly = true)
     public ConsentTemplatePage requireScoped(UUID templateId, UUID actorId) {
         List<ConsentTemplatePageRow> rows = mapper.findPage(actorId, templateId);
         if (rows.size() != 1) {

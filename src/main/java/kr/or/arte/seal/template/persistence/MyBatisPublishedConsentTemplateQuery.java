@@ -34,7 +34,7 @@ public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTem
     public PublishedConsentTemplateReference requirePublished(UUID actorId, UUID templateVersionId) {
         PublishedTemplateIdentityRow identity = mapper.findPublishedIdentity(actorId, templateVersionId)
                 .stream().findFirst().orElseThrow(() -> new IllegalArgumentException(
-                        "요청에 사용할 수 있는 발행 템플릿이 아닙니다."));
+                        "요청에 사용할 수 있는 동의서 양식이 아닙니다."));
         var detail = repository.requireVersion(actorId, identity.templateId(), templateVersionId);
         var activity = activityQuery.findReferenceForExistingTemplate(actorId,
                 detail.version().processingActivityVersionId());
@@ -49,5 +49,11 @@ public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTem
     @Override
     public List<PublishedConsentTemplateOption> findAllPublished(UUID actorId) {
         return mapper.findPublishedOptions(actorId);
+    }
+
+    @Override
+    public java.util.Optional<PublishedConsentTemplateOption> findVersionOption(
+            UUID actorId, UUID templateVersionId) {
+        return mapper.findVersionOption(actorId, templateVersionId).stream().findFirst();
     }
 }

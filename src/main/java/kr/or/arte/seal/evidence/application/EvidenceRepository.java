@@ -10,6 +10,9 @@ public interface EvidenceRepository extends EvidenceQueue {
     void failed(UUID packageId, long claimedRowVersion, String errorCode, Instant now);
     List<EvidencePackageSummary> search(UUID actorId, EvidenceGenerationStatus status); default List<EvidencePackageSummary> search(UUID actorId,EvidenceGenerationStatus status,int limit,int offset){return search(actorId,status).stream().skip(offset).limit(limit).toList();}
     Optional<EvidencePackageDetail> findScoped(UUID actorId, UUID packageId);
+    default Optional<EvidencePackageDetail> findByRequestScoped(UUID actorId, UUID requestId) {
+        return Optional.empty();
+    }
     void requeue(UUID actorId, UUID packageId, Instant now);
     void recordVerification(UUID packageId, UUID actorId, EvidenceVerificationResult result, Instant now);
 }

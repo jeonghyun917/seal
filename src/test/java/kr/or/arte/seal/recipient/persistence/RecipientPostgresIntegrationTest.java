@@ -31,12 +31,14 @@ class RecipientPostgresIntegrationTest {
         String email = "recipient-" + UUID.randomUUID() + "@example.com";
 
         UUID recipientId = management.create(new CreateRecipientCommand(actorId, organizationId,
-                "통합테스트 대상자", email, "통합테스트에서 직접 수집"));
+                "외부회사 주식회사", "교육팀장", "통합테스트 대상자", email, "통합테스트에서 직접 수집"));
 
         byte[] ciphertext = jdbc.queryForObject(
                 "SELECT recipient_email_ciphertext FROM seal.recipient WHERE recipient_id = ?",
                 byte[].class, recipientId);
         assertThat(new String(ciphertext)).doesNotContain(email);
         assertThat(query.find(actorId, recipientId).maskedEmail()).endsWith("@e******.com");
+        assertThat(query.find(actorId, recipientId).affiliationName()).isEqualTo("외부회사 주식회사");
+        assertThat(query.find(actorId, recipientId).jobTitle()).isEqualTo("교육팀장");
     }
 }

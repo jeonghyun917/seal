@@ -20,7 +20,9 @@ public interface EvidenceMapper {
                    @Param("now") Instant now);
     int fail(@Param("packageId") UUID packageId,@Param("claimedRowVersion") long claimedRowVersion,@Param("code") String code,@Param("now") Instant now);
     List<EvidencePackageSummary> search(@Param("actorId") UUID actorId,@Param("status") EvidenceGenerationStatus status,@Param("limit") int limit,@Param("offset") int offset);
-    Optional<EvidencePackageDetail> findScoped(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId);
+    Optional<EvidencePackageRow> findScoped(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId);
+    Optional<EvidencePackageRow> findByRequestScoped(@Param("actorId") UUID actorId,
+            @Param("requestId") UUID requestId);
     List<EvidenceFileMetadata> files(@Param("packageId") UUID packageId);
     int requeue(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId,@Param("now") Instant now);
     void verification(@Param("id") UUID id,@Param("packageId") UUID packageId,@Param("actorId") UUID actorId,

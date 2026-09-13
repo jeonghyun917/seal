@@ -43,7 +43,37 @@ class MailLocalProfileConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
+    // Both profiles must bind the relay policy and the actual mail sender to implicit TLS.
     @EnableConfigurationProperties(MailRelayProperties.class)
     static class MailPropertiesConfiguration {
+    }
+
+    @Test
+    void localAndProductionDefaultsUsePort465WithVerifiedTls() {
+        for (String profile : new String[] {"local", "prod"}) {
+            new ApplicationContextRunner()
+                    .withInitializer(new ConfigDataApplicationContextInitializer())
+                    .withUserConfiguration(MailPropertiesConfiguration.class)
+                    .withConfiguration(org.springframework.boot.autoconfigure.AutoConfigurations.of(
+                            org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration.class))
+                    .withPropertyValues("spring.profiles.active=" + profile,
+                            "SEAL_MAIL_FROM_ADDRESS=seal@arte.or.kr", "seal.mail.enabled=true")
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        var relay = context.getBean(MailRelayProperties.class);
+                        var sender = context.getBean(org.springframework.mail.javamail.JavaMailSenderImpl.class);
+                        assertThat(relay.port()).isEqualTo(465);
+                        assertThat(relay.sslEnabled()).isTrue();
+                        assertThat(relay.authEnabled()).isFalse();
+                        assertThat(sender.getHost()).isEqualTo(relay.host());
+                        assertThat(sender.getPort()).isEqualTo(relay.port());
+                        assertThat(sender.getJavaMailProperties())
+                                .containsEntry("mail.smtp.ssl.enable", "true")
+                                .containsEntry("mail.smtp.ssl.checkserveridentity", "true")
+                                .containsEntry("mail.smtp.starttls.enable", "false")
+                                .containsEntry("mail.smtp.auth", "false");
+                        assertThat(sender.getJavaMailProperties()).doesNotContainKey("mail.smtp.ssl.trust");
+                    });
+        }
     }
 }

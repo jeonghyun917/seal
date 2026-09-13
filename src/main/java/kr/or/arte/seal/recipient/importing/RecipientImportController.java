@@ -1,35 +1,97 @@
 package kr.or.arte.seal.recipient.importing;
 
-import jakarta.servlet.http.HttpServletResponse;
-import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.UUID;
+
 import kr.or.arte.seal.admin.config.AdminPrincipal;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import kr.or.arte.seal.recipient.application.RecipientInstitution;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.IOException; import java.util.UUID;
 
 @Controller
 public class RecipientImportController {
-    private final RecipientImportService service; private final OrganizationManagement organizations; private final ClamAvProperties clamAv;
-    public RecipientImportController(RecipientImportService service,OrganizationManagement organizations,ClamAvProperties clamAv){this.service=service;this.organizations=organizations;this.clamAv=clamAv;}
-    @GetMapping("/admin/recipients/import") @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
-    public String form(@AuthenticationPrincipal AdminPrincipal p,Model m){base(p,m);return "admin/recipients/import-form";}
-    @PostMapping("/admin/recipients/import") @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
-    public String upload(@RequestParam UUID organizationUnitId,@RequestParam String collectionBasis,@RequestParam MultipartFile file,
-            @AuthenticationPrincipal AdminPrincipal p,Model m) throws IOException{
-        try{var preview=service.validate(p.adminUserId(),organizationUnitId,collectionBasis,file.getBytes());return "redirect:/admin/recipients/import/"+preview.batchId();}
-        catch(IllegalArgumentException|RecipientWorkbookException e){base(p,m);m.addAttribute("error",e.getMessage());m.addAttribute("organizationUnitId",organizationUnitId);m.addAttribute("collectionBasis",collectionBasis);return "admin/recipients/import-form";}
+    private static final MediaType XLSX_MEDIA_TYPE = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+    private final RecipientImportService service;
+    private final ClamAvProperties clamAv;
+
+    public RecipientImportController(RecipientImportService service, ClamAvProperties clamAv) {
+        this.service = service;
+        this.clamAv = clamAv;
     }
-    @GetMapping("/admin/recipients/import/{batchId}") @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
-    public String preview(@PathVariable UUID batchId,@AuthenticationPrincipal AdminPrincipal p,Model m){m.addAttribute("administrator",p);m.addAttribute("preview",service.preview(p.adminUserId(),batchId));return "admin/recipients/import-preview";}
-    @PostMapping("/admin/recipients/import/{batchId}/confirm") @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
-    public String confirm(@PathVariable UUID batchId,@AuthenticationPrincipal AdminPrincipal p){service.confirm(p.adminUserId(),batchId);return "redirect:/admin/recipients/import/"+batchId+"?completed";}
-    @GetMapping("/admin/recipients/import/template.xlsx") @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
-    public void template(HttpServletResponse response) throws IOException{response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");response.setHeader("Content-Disposition","attachment; filename=recipient-import-template.xlsx");
-        try(var book=new XSSFWorkbook()){var sheet=book.createSheet("대상자");var h=sheet.createRow(0);h.createCell(0).setCellValue("이름");h.createCell(1).setCellValue("이메일");sheet.setColumnWidth(0,5000);sheet.setColumnWidth(1,9000);book.write(response.getOutputStream());}}
-    private void base(AdminPrincipal p,Model m){m.addAttribute("administrator",p);m.addAttribute("organizations",organizations.findVisibleOrganizations(p.adminUserId()));m.addAttribute("clamAvDisabled",!clamAv.enabled());}
+
+    @GetMapping("/admin/recipients/import")
+    @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
+    public String form(@AuthenticationPrincipal AdminPrincipal principal, Model model) {
+        base(principal, model);
+        return "admin/recipients/import-form";
+    }
+
+    @PostMapping("/admin/recipients/import")
+    @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
+    public String upload(@RequestParam MultipartFile file,
+            @AuthenticationPrincipal AdminPrincipal principal, Model model) throws IOException {
+        try {
+            var preview = service.validate(principal.adminUserId(),
+                    RecipientInstitution.ORGANIZATION_UNIT_ID, file.getBytes());
+            return "redirect:/admin/recipients/import/" + preview.batchId();
+        } catch (IllegalArgumentException | RecipientWorkbookException exception) {
+            base(principal, model);
+            model.addAttribute("error", exception.getMessage());
+            return "admin/recipients/import-form";
+        }
+    }
+
+    @GetMapping("/admin/recipients/import/{batchId}")
+    @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
+    public String preview(@PathVariable UUID batchId,
+            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+        model.addAttribute("administrator", principal);
+        model.addAttribute("preview", service.preview(principal.adminUserId(), batchId));
+        return "admin/recipients/import-preview";
+    }
+
+    @PostMapping("/admin/recipients/import/{batchId}/confirm")
+    @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
+    public String confirm(@PathVariable UUID batchId,
+            @AuthenticationPrincipal AdminPrincipal principal) {
+        service.confirm(principal.adminUserId(), batchId);
+        return "redirect:/admin/recipients/import/" + batchId + "?completed";
+    }
+
+    @GetMapping({"/admin/recipients/import/template.xlsx", "/admin/recipients/import/template"})
+    @PreAuthorize("hasAuthority('RECIPIENT_IMPORT')")
+    public ResponseEntity<byte[]> template() throws IOException {
+        byte[] workbookBytes;
+        try (var book = RecipientWorkbookTemplate.create();
+                var output = new ByteArrayOutputStream()) {
+            book.write(output);
+            workbookBytes = output.toByteArray();
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, XLSX_MEDIA_TYPE.toString())
+                .contentLength(workbookBytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=recipient-import-template.xlsx")
+                .body(workbookBytes);
+    }
+
+    private void base(AdminPrincipal principal, Model model) {
+        model.addAttribute("administrator", principal);
+        model.addAttribute("institutionName", RecipientInstitution.ORGANIZATION_NAME);
+        model.addAttribute("clamAvDisabled", !clamAv.enabled());
+    }
 }

@@ -5,6 +5,8 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.delivery.application.MailOutboxQueryService;
 import kr.or.arte.seal.delivery.application.MailOutboxStatus;
 import kr.or.arte.seal.delivery.config.MailRelayProperties;
+import kr.or.arte.seal.recipient.application.RecipientQueryService;
+import kr.or.arte.seal.request.application.ConsentRequestQueryService;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,30 +23,47 @@ import java.util.UUID;
 @Controller
 public class MailOutboxController {
     private final MailOutboxQueryService query;
+    private final ConsentRequestQueryService requestQuery;
+    private final RecipientQueryService recipientQuery;
     private final MailRelayProperties mailProperties;
 
-    public MailOutboxController(MailOutboxQueryService query, MailRelayProperties mailProperties) {
+    public MailOutboxController(MailOutboxQueryService query, ConsentRequestQueryService requestQuery,
+            RecipientQueryService recipientQuery, MailRelayProperties mailProperties) {
         this.query = query;
+        this.requestQuery = requestQuery;
+        this.recipientQuery = recipientQuery;
         this.mailProperties = mailProperties;
     }
 
     @GetMapping("/admin/mail-outbox")
     @PreAuthorize("hasAuthority('MAIL_VIEW')")
     public String list(@RequestParam(required = false) MailOutboxStatus status,
-            @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+            @RequestParam(required = false) String q, @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
-        var pageResult=query.searchPage(principal.adminUserId(),status,page,20); model.addAttribute("mailItems",pageResult.items()); model.addAttribute("pageResult",pageResult);
+        var pageResult=query.searchPage(principal.adminUserId(),status,q,page,20);
+        var items=pageResult.items().stream().map(item->{var request=requestQuery.require(principal.adminUserId(),item.requestId());return new MailListItem(item,request,recipientQuery.find(principal.adminUserId(),request.recipientId()));}).toList();
+        model.addAttribute("mailItems",items); model.addAttribute("pageResult",pageResult); model.addAttribute("q",q);
         model.addAttribute("selectedStatus", status);
         model.addAttribute("mailEnabled", mailProperties.enabled());
         return "admin/mail/list";
     }
+
+    public record MailListItem(kr.or.arte.seal.delivery.application.MailOutboxSummary summary,
+            kr.or.arte.seal.request.application.ConsentRequestRecord request,
+            kr.or.arte.seal.recipient.application.RecipientDetail recipient) { }
 
     @GetMapping("/admin/mail-outbox/{outboxId}")
     @PreAuthorize("hasAuthority('MAIL_VIEW')")
     public String detail(@PathVariable UUID outboxId, @AuthenticationPrincipal AdminPrincipal principal,
             Model model) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("mailItem", query.require(principal.adminUserId(), outboxId));
+        var mailItem = query.require(principal.adminUserId(), outboxId);
+        var request = requestQuery.require(principal.adminUserId(), mailItem.requestId());
+        model.addAttribute("mailItem", mailItem);
+        model.addAttribute("requestCode", request.requestCode());
+        model.addAttribute("recipient", recipientQuery.find(principal.adminUserId(), request.recipientId()));
+        MailSchedulePresentation.from(mailItem)
+                .ifPresent(scheduleView -> model.addAttribute("scheduleView", scheduleView));
         return "admin/mail/detail";
     }
 

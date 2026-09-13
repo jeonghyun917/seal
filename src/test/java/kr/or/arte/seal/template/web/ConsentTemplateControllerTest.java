@@ -4,7 +4,11 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityQuery;
+import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityReference;
+import kr.or.arte.seal.policy.application.activity.ApprovedDataItemReference;
 import kr.or.arte.seal.template.application.ConsentTemplateManagement;
+import kr.or.arte.seal.template.application.ConsentTemplateDetail;
+import kr.or.arte.seal.template.application.PublishedTemplateView;
 import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.TemplateNotFoundException;
 import kr.or.arte.seal.template.application.TemplatePreviewRenderer;
@@ -22,15 +26,19 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -66,6 +74,68 @@ class ConsentTemplateControllerTest {
     }
 
     @Test
+    void permittedAdministratorCanOpenDeletedList() throws Exception {
+        mockMvc.perform(get("/admin/templates/deleted")
+                        .with(authentication(admin("CONSENT_TEMPLATE_VIEW"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/templates/deleted-list"))
+                .andExpect(model().attributeExists("deletedTemplates", "administrator"));
+    }
+
+    @Test
+    void activityOptionsReturnsOneSearchPageWithDataItems() throws Exception {
+        List<ApprovedProcessingActivityReference> activities = IntStream.rangeClosed(1, 21)
+                .mapToObj(ConsentTemplateControllerTest::approvedActivity)
+                .toList();
+        given(approvedActivityQuery.searchApprovedForTemplate(
+                principal().adminUserId(), "교육", 21, 0))
+                .willReturn(activities);
+
+        mockMvc.perform(get("/admin/templates/activity-options")
+                        .param("keyword", "교육")
+                        .param("page", "1")
+                        .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(20))
+                .andExpect(jsonPath("$.items[0].activityName").value("교육 처리업무 1"))
+                .andExpect(jsonPath("$.items[0].dataItems[0].itemName").value("성명"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.hasNext").value(true));
+    }
+
+    @Test
+    void bulkDeleteRequiresEditPermissionAndCsrf() throws Exception {
+        mockMvc.perform(post("/admin/templates/delete")
+                        .param("templateIds", TEMPLATE_ID.toString())
+                        .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void permittedAdministratorCanBulkDelete() throws Exception {
+        mockMvc.perform(post("/admin/templates/delete")
+                        .param("templateIds", TEMPLATE_ID.toString())
+                        .param("deleteReason", "중복 템플릿 정리")
+                        .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("/admin/templates?deleted"));
+
+        then(management).should().deleteTemplates(List.of(TEMPLATE_ID), "중복 템플릿 정리",
+                principal().adminUserId());
+    }
+
+    @Test
+    void permittedAdministratorCanBulkRestore() throws Exception {
+        mockMvc.perform(post("/admin/templates/restore")
+                        .param("templateIds", TEMPLATE_ID.toString())
+                        .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("/admin/templates/deleted?restored"));
+
+        then(management).should().restoreTemplates(List.of(TEMPLATE_ID),
+                principal().adminUserId());
+    }
+    @Test
     void createRejectsPostWithoutCsrf() throws Exception {
         mockMvc.perform(post("/admin/templates")
                         .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))))
@@ -78,7 +148,6 @@ class ConsentTemplateControllerTest {
 
         mockMvc.perform(post("/admin/templates")
                         .with(authentication(admin("CONSENT_TEMPLATE_EDIT"))).with(csrf())
-                        .param("templateCode", "TPL-EDU")
                         .param("templateName", "교육 프로그램 동의서")
                         .param("processingActivityVersionId", ACTIVITY_VERSION_ID.toString())
                         .param("title", "교육 프로그램 개인정보 동의서")
@@ -103,6 +172,29 @@ class ConsentTemplateControllerTest {
         mockMvc.perform(get("/admin/templates/{id}", TEMPLATE_ID)
                         .with(authentication(admin("CONSENT_TEMPLATE_VIEW"))))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void permittedAdministratorCanOpenPublishedVersionDetail() throws Exception {
+        UUID versionId = UUID.randomUUID();
+        ConsentTemplateDetail detail = mock(ConsentTemplateDetail.class);
+        ApprovedProcessingActivityReference policy = mock(ApprovedProcessingActivityReference.class);
+        PublishedTemplateView preview = mock(PublishedTemplateView.class);
+        given(query.requireVersionScoped(TEMPLATE_ID, versionId, principal().adminUserId()))
+                .willReturn(detail);
+        given(detail.version()).willReturn(mock(kr.or.arte.seal.template.domain.ConsentTemplateVersion.class));
+        given(detail.version().processingActivityVersionId()).willReturn(ACTIVITY_VERSION_ID);
+        given(approvedActivityQuery.findReferenceForExistingTemplate(
+                principal().adminUserId(), ACTIVITY_VERSION_ID)).willReturn(policy);
+        given(previewRenderer.toView(detail, policy)).willReturn(preview);
+
+        mockMvc.perform(get("/admin/templates/{templateId}/versions/{versionId}",
+                        TEMPLATE_ID, versionId)
+                        .with(authentication(admin("CONSENT_TEMPLATE_VIEW"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/templates/version-detail"))
+                .andExpect(model().attribute("detail", detail))
+                .andExpect(model().attribute("preview", preview));
     }
 
     @Test
@@ -131,5 +223,17 @@ class ConsentTemplateControllerTest {
         return new AdminPrincipal(UUID.fromString("30000000-0000-0000-0000-000000000001"),
                 "template-admin", "템플릿 관리자",
                 UUID.fromString("30000000-0000-0000-0000-000000000002"), false);
+    }
+
+    private static ApprovedProcessingActivityReference approvedActivity(int number) {
+        UUID activityId = UUID.nameUUIDFromBytes(("activity-" + number).getBytes());
+        UUID versionId = UUID.nameUUIDFromBytes(("version-" + number).getBytes());
+        UUID itemId = UUID.nameUUIDFromBytes(("item-" + number).getBytes());
+        return new ApprovedProcessingActivityReference(activityId, versionId,
+                principal().organizationUnitId(), "PA-EDU-" + number, "교육 처리업무 " + number,
+                "교육 프로그램 운영을 위한 개인정보 처리", "CONSENT",
+                UUID.nameUUIDFromBytes(("retention-" + number).getBytes()),
+                "동의 제출 후 1년",
+                List.of(new ApprovedDataItemReference(itemId, 1, "성명", true)));
     }
 }

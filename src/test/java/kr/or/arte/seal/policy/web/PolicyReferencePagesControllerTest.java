@@ -4,11 +4,14 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.policy.application.activity.ProcessingActivityQuery;
+import kr.or.arte.seal.policy.application.activity.ProcessingActivityCreateCommand;
 import kr.or.arte.seal.policy.application.activity.ProcessingActivityManagementService;
 import kr.or.arte.seal.policy.application.retention.RetentionPolicyQuery;
 import kr.or.arte.seal.policy.application.retention.RetentionPolicyManagementService;
+import kr.or.arte.seal.policy.domain.retention.RetentionStartEvent;
 import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -27,6 +30,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -71,22 +76,35 @@ class PolicyReferencePagesControllerTest {
     }
 
     @Test
-    void validProcessingActivityFormCreatesDraftAndRedirects() throws Exception {
+    void processingActivityFormCreatesEverySubmittedDataItemBeyondThree() throws Exception {
         UUID activityId = UUID.fromString("80000000-0000-0000-0000-000000000001");
         given(processingActivityManagementService.create(any())).willReturn(activityId);
         mockMvc.perform(post("/admin/processing-activities")
                         .with(authentication(admin("PROCESSING_ACTIVITY_EDIT"))).with(csrf())
-                        .param("activityCode", "EDU-PROGRAM")
                         .param("activityName", "교육 프로그램 운영")
                         .param("ownerOrganizationUnitId", "30000000-0000-0000-0000-000000000001")
                         .param("processingPurpose", "교육 프로그램 참여자를 등록하고 운영하기 위한 목적입니다.")
                         .param("legalBasisType", "CONSENT")
                         .param("legalBasisDetail", "정보주체의 개인정보 수집 이용 동의")
                         .param("retentionPolicyVersionId", "70000000-0000-0000-0000-000000000001")
-                        .param("itemName1", "성명").param("necessityReason1", "참여자 식별과 출석 확인")
-                        .param("required1", "true"))
+                        .param("items[0].itemName", "성명")
+                        .param("items[0].necessityReason", "참여자 식별과 출석 확인")
+                        .param("items[0].required", "true")
+                        .param("items[1].itemName", "이메일")
+                        .param("items[1].necessityReason", "동의 요청 메일 발송")
+                        .param("items[2].itemName", "소속")
+                        .param("items[2].necessityReason", "대상자 소속 확인")
+                        .param("items[3].itemName", "전화번호")
+                        .param("items[3].necessityReason", "일정 변경 안내"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/processing-activities/" + activityId + "?created"));
+
+        ArgumentCaptor<ProcessingActivityCreateCommand> command =
+                ArgumentCaptor.forClass(ProcessingActivityCreateCommand.class);
+        verify(processingActivityManagementService).create(command.capture());
+        assertThat(command.getValue().dataItems())
+                .extracting(item -> item.itemName())
+                .containsExactly("성명", "이메일", "소속", "전화번호");
     }
 
     @Test
@@ -94,7 +112,11 @@ class PolicyReferencePagesControllerTest {
         mockMvc.perform(get("/admin/retention-policies/new")
                         .with(authentication(admin("RETENTION_POLICY_EDIT"))))
                 .andExpect(status().isOk())
-                .andExpect(view().name("admin/retention-policies/form"));
+                .andExpect(view().name("admin/retention-policies/form"))
+                .andExpect(model().attribute("startEvents", List.of(
+                        RetentionStartEvent.MAIL_FIRST_SENT_AT,
+                        RetentionStartEvent.REQUEST_EXPIRES_AT,
+                        RetentionStartEvent.CONSENT_SUBMITTED_AT)));
     }
 
     @Test
@@ -111,7 +133,6 @@ class PolicyReferencePagesControllerTest {
 
         mockMvc.perform(post("/admin/retention-policies")
                         .with(authentication(admin("RETENTION_POLICY_EDIT"))).with(csrf())
-                        .param("policyCode", "RP-001")
                         .param("policyName", "교육사업 보유정책")
                         .param("ownerOrganizationUnitId", "30000000-0000-0000-0000-000000000001")
                         .param("startEvent", "CONSENT_SUBMITTED_AT")

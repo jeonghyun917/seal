@@ -30,13 +30,33 @@
                WHERE version.consent_template_id = template.consent_template_id
                ORDER BY version.version_number DESC LIMIT 1
           ) latest ON TRUE
-         WHERE (#{keyword, jdbcType=VARCHAR} IS NULL
+         WHERE template.deleted_at IS NULL
+           AND (#{keyword, jdbcType=VARCHAR} IS NULL
                 OR template.template_code ILIKE '%' || #{keyword} || '%'
                 OR template.template_name ILIKE '%' || #{keyword} || '%')
            AND (#{status, jdbcType=VARCHAR} IS NULL OR template.template_status = #{status})
          ORDER BY template.template_code
     </select>
 
+    <select id="searchDeleted" resultType="kr.or.arte.seal.template.application.DeletedConsentTemplateSummary">
+        <include refid="visibleScope"/>
+        SELECT template.consent_template_id, template.template_code, template.template_name,
+               activity.activity_name AS processing_activity_name, template.template_status,
+               template.deleted_at, deleter.display_name AS deleted_by_name,
+               template.delete_reason
+          FROM seal.consent_template template
+          JOIN seal.processing_activity activity
+            ON activity.processing_activity_id = template.processing_activity_id
+          JOIN visible_scope scope
+            ON scope.organization_unit_id = activity.owner_organization_unit_id
+          JOIN seal.admin_user deleter
+            ON deleter.admin_user_id = template.deleted_by
+         WHERE template.deleted_at IS NOT NULL
+           AND (#{keyword, jdbcType=VARCHAR} IS NULL
+                OR template.template_code ILIKE '%' || #{keyword} || '%'
+                OR template.template_name ILIKE '%' || #{keyword} || '%')
+         ORDER BY template.deleted_at DESC, template.template_code
+    </select>
     <select id="findPage" resultType="kr.or.arte.seal.template.persistence.ConsentTemplatePageRow">
         <include refid="visibleScope"/>
         SELECT template.consent_template_id, template.template_code, template.template_name,
@@ -48,6 +68,7 @@
           JOIN visible_scope scope
             ON scope.organization_unit_id = activity.owner_organization_unit_id
          WHERE template.consent_template_id = #{templateId}
+           AND template.deleted_at IS NULL
     </select>
 
     <select id="findVersions" resultType="kr.or.arte.seal.template.application.ConsentTemplateVersionSummary">
@@ -68,6 +89,7 @@
           LEFT JOIN seal.admin_user approver ON approver.admin_user_id = version.approved_by
           LEFT JOIN seal.admin_user publisher ON publisher.admin_user_id = version.published_by
          WHERE template.consent_template_id = #{templateId}
+           AND template.deleted_at IS NULL
          ORDER BY version.version_number DESC
     </select>
 
@@ -83,6 +105,7 @@
            AND version.workflow_status IN ('PUBLISHED', 'RETIRED')
            AND version.content_hash IS NOT NULL
            AND template.template_status = 'ACTIVE'
+           AND template.deleted_at IS NULL
            AND activity.activity_status = 'ACTIVE'
            AND (
                 NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
@@ -102,7 +125,8 @@
           ON version.consent_template_version_id=template.current_published_version_id
         JOIN seal.processing_activity activity ON activity.processing_activity_id=template.processing_activity_id
         JOIN visible_scope scope ON scope.organization_unit_id=activity.owner_organization_unit_id
-        WHERE template.template_status='ACTIVE' AND activity.activity_status='ACTIVE'
+        WHERE template.template_status='ACTIVE' AND template.deleted_at IS NULL
+          AND activity.activity_status='ACTIVE'
           AND version.workflow_status='PUBLISHED'
           AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
                            WHERE configured.admin_user_id=#{actorId})
@@ -111,4 +135,22 @@
                             AND allowed.processing_activity_id=activity.processing_activity_id))
         ORDER BY template.template_code
     </select>
-</mapper>
+    <select id="findVersionOption" resultType="kr.or.arte.seal.template.application.PublishedConsentTemplateOption">
+        <include refid="visibleScope"/>
+        SELECT version.consent_template_version_id AS template_version_id,
+               template.template_code, template.template_name,
+               activity.activity_name, version.version_number
+        FROM seal.consent_template_version version
+        JOIN seal.consent_template template
+          ON template.consent_template_id = version.consent_template_id
+        JOIN seal.processing_activity activity
+          ON activity.processing_activity_id = template.processing_activity_id
+        JOIN visible_scope scope
+          ON scope.organization_unit_id = activity.owner_organization_unit_id
+        WHERE version.consent_template_version_id = #{templateVersionId}
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id = #{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id = #{actorId}
+                            AND allowed.processing_activity_id = activity.processing_activity_id))
+    </select></mapper>

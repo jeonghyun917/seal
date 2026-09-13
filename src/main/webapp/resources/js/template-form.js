@@ -9,6 +9,7 @@
             item.querySelector("[data-item-number]").textContent = String(index + 1);
             item.querySelectorAll("[name]").forEach((field) => {
                 field.name = field.name.replace(/items\[\d+\]/, `items[${index}]`);
+                if (field.id) field.id = field.id.replace(/items\d+/, `items${index}`);
             });
         });
     };
@@ -18,6 +19,7 @@
         const html = template.innerHTML.replaceAll("__INDEX__", String(index));
         container.insertAdjacentHTML("beforeend", html);
         reindex();
+        container.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
     container.addEventListener("click", (event) => {
@@ -27,5 +29,6 @@
         if (items.length <= 1) return;
         remove.closest("[data-consent-item]").remove();
         reindex();
+        container.dispatchEvent(new Event("change", { bubbles: true }));
     });
 })();

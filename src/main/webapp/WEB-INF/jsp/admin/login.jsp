@@ -6,14 +6,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>관리자 로그인 | 개인정보 전자동의·증적 관리시스템</title>
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css?v=20260907-3">
 </head>
 <body class="auth-body">
 <main class="auth-shell">
     <section class="auth-intro" aria-labelledby="service-title">
-        <a class="brand-mark" href="${pageContext.request.contextPath}/">한국문화예술교육진흥원</a>
-        <p class="eyebrow">PERSONAL INFORMATION CONSENT</p>
-        <h1 id="service-title">개인정보 전자동의<br>증적 관리시스템</h1>
+        <a class="institution-brand" href="${pageContext.request.contextPath}/" aria-label="한국문화예술교육진흥원 홈">
+            <img src="${pageContext.request.contextPath}/resources/images/arte-logo-ko.png"
+                 alt="한국문화예술교육진흥원">
+        </a>
+        <h1 id="service-title">
+            <span>개인정보 전자동의</span>
+            <strong>증적 관리시스템</strong>
+        </h1>
         <p class="lead">기관 담당자 전용 화면입니다. 승인받은 관리자 계정으로 로그인해 주세요.</p>
         <ul class="trust-list">
             <li>DB 기반 관리자 인증</li>

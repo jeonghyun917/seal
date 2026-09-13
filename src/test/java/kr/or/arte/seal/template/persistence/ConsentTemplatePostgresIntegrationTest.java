@@ -5,6 +5,7 @@ import kr.or.arte.seal.template.application.ConsentTemplateDetail;
 import kr.or.arte.seal.template.application.ConsentTemplateManagement;
 import kr.or.arte.seal.template.application.ConsentTemplateQueryService;
 import kr.or.arte.seal.template.application.ConsentTemplateRepository;
+import kr.or.arte.seal.template.application.PublishedConsentTemplateQuery;
 import kr.or.arte.seal.template.domain.ConsentItemDefinition;
 import kr.or.arte.seal.template.domain.ConsentItemType;
 import kr.or.arte.seal.template.domain.ConsentTemplateVersion;
@@ -34,6 +35,7 @@ class ConsentTemplatePostgresIntegrationTest {
     @Autowired ConsentTemplateManagement management;
     @Autowired ConsentTemplateQueryService queryService;
     @Autowired ApprovedProcessingActivityQuery approvedActivityQuery;
+    @Autowired PublishedConsentTemplateQuery publishedTemplateQuery;
     @Autowired JdbcTemplate jdbcTemplate;
 
     @Test
@@ -93,6 +95,45 @@ class ConsentTemplatePostgresIntegrationTest {
                 .satisfies(item -> assertThat(item.code()).isEqualTo("EMAIL"));
     }
 
+    @Test
+    void softDeleteHidesTemplateAndRestoreReturnsItWithAuditMetadata() {
+        Fixture fixture = fixture();
+        UUID templateId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        ConsentTemplateVersion draft = ConsentTemplateVersion.draft(
+                versionId, templateId, fixture.activityId(), fixture.activityVersionId(),
+                1, "삭제 복구 통합테스트 동의서",
+                "<p>삭제와 복구 동작을 검증하는 개인정보 처리 안내입니다.</p>",
+                List.of(item(1, "NAME", "성명 수집 이용 동의", fixture.dataItemIds().get(0))),
+                fixture.authorId());
+        repository.insertTemplate(new ConsentTemplateDetail(
+                templateId, "TPL-" + compact(templateId), "삭제 복구 통합테스트",
+                fixture.activityId(), "교육 프로그램 운영", "ACTIVE", null, 0, draft),
+                fixture.authorId(), NOW);
+
+        management.deleteTemplates(List.of(templateId), "중복 템플릿 정리", fixture.authorId());
+
+        assertThat(queryService.search(fixture.authorId(), null, null)).noneMatch(
+                summary -> summary.consentTemplateId().equals(templateId));
+        assertThat(queryService.searchDeleted(fixture.authorId(), "삭제 복구"))
+                .singleElement()
+                .satisfies(summary -> {
+                    assertThat(summary.consentTemplateId()).isEqualTo(templateId);
+                    assertThat(summary.templateStatus()).isEqualTo("ACTIVE");
+                    assertThat(summary.deletedAt()).isNotNull();
+                    assertThat(summary.deletedByName()).isEqualTo("통합테스트 관리자");
+                    assertThat(summary.deleteReason()).isEqualTo("중복 템플릿 정리");
+                });
+        assertThat(publishedTemplateQuery.findAllPublished(fixture.authorId())).noneMatch(
+                option -> option.templateVersionId().equals(versionId));
+
+        management.restoreTemplates(List.of(templateId), fixture.authorId());
+
+        assertThat(queryService.search(fixture.authorId(), "삭제 복구", "ACTIVE"))
+                .singleElement().satisfies(summary ->
+                        assertThat(summary.consentTemplateId()).isEqualTo(templateId));
+        assertThat(queryService.searchDeleted(fixture.authorId(), "삭제 복구")).isEmpty();
+    }
     @Test
     void draftItemReplacementFunctionRejectsOutOfScopeActor() {
         Fixture fixture = fixture();

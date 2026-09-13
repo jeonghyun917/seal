@@ -53,9 +53,11 @@ class RecipientManagementServiceTest {
     @Test
     void createEncryptsPersonalDataAndWritesPiiFreeAudit() {
         UUID id = service.create(new CreateRecipientCommand(ACTOR_ID, ORG_ID,
-                "홍길동", " Hong.Gil@Example.COM ", "교육 참여 신청서 수집"));
+                "외부회사 주식회사", "교육팀장", "홍길동", " Hong.Gil@Example.COM ", "교육 참여 신청서 수집"));
 
         RecipientStoredRecord stored = repository.rows.get(id);
+        assertThat(stored.affiliationName()).isEqualTo("외부회사 주식회사");
+        assertThat(stored.jobTitle()).isEqualTo("교육팀장");
         assertThat(new String(stored.nameCiphertext())).doesNotContain("홍길동");
         assertThat(new String(stored.emailCiphertext())).doesNotContain("Hong.Gil");
         assertThat(stored.emailLookupHmac()).isEqualTo(hasher.hmac("hong.gil@example.com"));
@@ -66,6 +68,16 @@ class RecipientManagementServiceTest {
         });
     }
 
+    @Test
+    void updateAllowsClearingOptionalExternalAffiliation() {
+        UUID id = service.create(new CreateRecipientCommand(ACTOR_ID, ORG_ID,
+                "외부회사 주식회사", "홍길동", "hong@example.com", "교육 참여 신청서 수집"));
+
+        service.update(id, new UpdateRecipientCommand(ACTOR_ID, "", "홍길동", "hong@example.com",
+                "교육 참여 신청서 수집", 0));
+
+        assertThat(repository.rows.get(id).affiliationName()).isNull();
+    }
     @Test
     void duplicateActiveEmailIsRejectedWithoutExposingPlainEmail() {
         service.create(new CreateRecipientCommand(ACTOR_ID, ORG_ID,
@@ -95,7 +107,7 @@ class RecipientManagementServiceTest {
     void queryMasksValuesOnlyAfterScopedRecordLookup() {
         UUID id = service.create(new CreateRecipientCommand(ACTOR_ID, ORG_ID,
                 "홍길동", "hong@example.com", "교육 참여 신청서 수집"));
-        RecipientQueryService query = new RecipientQueryService(repository, cipher, hasher);
+        RecipientQueryService query = new RecipientQueryService(repository, cipher);
 
         RecipientDetail detail = query.find(ACTOR_ID, id);
 

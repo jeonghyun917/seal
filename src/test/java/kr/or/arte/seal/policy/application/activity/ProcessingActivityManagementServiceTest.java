@@ -4,6 +4,7 @@ import kr.or.arte.seal.audit.application.AuditEventWriter;
 import kr.or.arte.seal.policy.domain.activity.LegalBasisType;
 import kr.or.arte.seal.policy.domain.activity.ProcessingDataItem;
 import kr.or.arte.seal.policy.persistence.activity.ProcessingActivityMapper;
+import kr.or.arte.seal.policy.persistence.activity.ProcessingActivityInsert;
 import kr.or.arte.seal.policy.persistence.activity.ProcessingActivityVersionRow;
 import kr.or.arte.seal.policy.domain.activity.ProcessingWorkflowStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import org.mockito.ArgumentCaptor;
 
 class ProcessingActivityManagementServiceTest {
     private static final UUID ACTOR_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
@@ -52,6 +54,22 @@ class ProcessingActivityManagementServiceTest {
 
         assertThat(activityId).isNotNull();
         verify(mapper).insertDataItems(org.mockito.ArgumentMatchers.argThat(items -> items.size() == 2));
+    }
+
+    @Test
+    void generatesActivityCode() {
+        given(mapper.canAccessActiveOrganization(ACTOR_ID, ORGANIZATION_ID)).willReturn(true);
+        given(mapper.canUseApprovedRetentionVersion(ACTOR_ID, POLICY_VERSION_ID)).willReturn(true);
+        given(mapper.insertActivity(any())).willReturn(1);
+        given(mapper.insertVersion(any())).willReturn(1);
+        given(mapper.insertDataItems(any())).willReturn(1);
+
+        service.create(command(List.of(new ProcessingDataItem("성명", "참여자 식별", true))));
+
+        ArgumentCaptor<ProcessingActivityInsert> activity = ArgumentCaptor.forClass(ProcessingActivityInsert.class);
+        verify(mapper).insertActivity(activity.capture());
+        assertThat(activity.getValue().activityCode())
+                .matches("PA-[A-F0-9]{16}");
     }
 
     @Test
@@ -92,7 +110,7 @@ class ProcessingActivityManagementServiceTest {
     }
 
     private static ProcessingActivityCreateCommand command(List<ProcessingDataItem> items) {
-        return new ProcessingActivityCreateCommand("EDU-PROGRAM", "교육 프로그램 운영",
+        return new ProcessingActivityCreateCommand("교육 프로그램 운영",
                 ORGANIZATION_ID, "교육 프로그램 참여자를 등록하고 운영하기 위한 목적입니다.",
                 LegalBasisType.CONSENT, "정보주체의 개인정보 수집·이용 동의",
                 POLICY_VERSION_ID, items, ACTOR_ID);

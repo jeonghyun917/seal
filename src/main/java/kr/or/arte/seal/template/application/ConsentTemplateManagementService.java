@@ -12,16 +12,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 public class ConsentTemplateManagementService implements ConsentTemplateManagement {
-    private static final Pattern TEMPLATE_CODE = Pattern.compile("^[A-Z0-9-]{2,30}$");
 
     private final ConsentTemplateRepository repository;
     private final ApprovedProcessingActivityQuery policyQuery;
@@ -45,7 +46,7 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
     @Override
     @Transactional
     public UUID create(CreateConsentTemplateCommand command) {
-        validateIdentity(command.templateCode(), command.templateName());
+        validateName(command.templateName());
         Objects.requireNonNull(command.actorId(), "actorId");
         ApprovedProcessingActivityReference policy = policyQuery.findApprovedForTemplate(
                 command.actorId(), command.processingActivityVersionId());
@@ -56,7 +57,7 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
                 sanitizeIntroduction(command.introductionHtml()),
                 toItems(command.items(), policy), command.actorId());
         validator.validateAgainst(draft, policy);
-        repository.insertTemplate(new ConsentTemplateDetail(templateId, command.templateCode(),
+        repository.insertTemplate(new ConsentTemplateDetail(templateId, generateTemplateCode(templateId),
                 command.templateName().strip(), policy.activityId(), policy.activityName(),
                 "ACTIVE", null, 0, draft), command.actorId(), clock.instant());
         audit("CONSENT_TEMPLATE_CREATE", templateId, versionId, command.actorId(), null);
@@ -153,17 +154,67 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
     @Transactional
     public void updateStatus(UUID templateId, String status, long versionNo, UUID actorId) {
         if (!"ACTIVE".equals(status) && !"INACTIVE".equals(status)) {
-            throw new IllegalArgumentException("템플릿 상태가 올바르지 않습니다.");
+            throw new IllegalArgumentException("동의서 양식 상태가 올바르지 않습니다.");
         }
         repository.updateStatus(templateId, status, versionNo, actorId, clock.instant());
         audit("CONSENT_TEMPLATE_STATUS_UPDATE", templateId, templateId, actorId, null);
     }
 
+    @Override
+    @Transactional
+    public void deleteTemplates(List<UUID> templateIds, String reason, UUID actorId) {
+        List<UUID> normalizedIds = normalizeSelection(templateIds, "삭제할 동의서 양식을 선택해 주세요.");
+        String normalizedReason = normalizeDeleteReason(reason);
+        Instant now = clock.instant();
+        int changed = repository.softDelete(normalizedIds, normalizedReason, actorId, now);
+        if (changed != normalizedIds.size()) {
+            throw new TemplateBusinessConflictException("선택한 동의서 양식 중 삭제할 수 없는 항목이 있습니다.");
+        }
+        normalizedIds.forEach(templateId -> audit("CONSENT_TEMPLATE_DELETE", templateId,
+                templateId, actorId, null));
+    }
+
+    @Override
+    @Transactional
+    public void restoreTemplates(List<UUID> templateIds, UUID actorId) {
+        List<UUID> normalizedIds = normalizeSelection(templateIds, "복구할 동의서 양식을 선택해 주세요.");
+        int changed = repository.restore(normalizedIds, actorId, clock.instant());
+        if (changed != normalizedIds.size()) {
+            throw new TemplateBusinessConflictException("선택한 동의서 양식 중 복구할 수 없는 항목이 있습니다.");
+        }
+        normalizedIds.forEach(templateId -> audit("CONSENT_TEMPLATE_RESTORE", templateId,
+                templateId, actorId, null));
+    }
+
+    private List<UUID> normalizeSelection(List<UUID> templateIds, String emptyMessage) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            throw new IllegalArgumentException(emptyMessage);
+        }
+        if (templateIds.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("선택한 동의서 양식 정보가 올바르지 않습니다.");
+        }
+        List<UUID> normalized = templateIds.stream().distinct().toList();
+        if (normalized.size() > 100) {
+            throw new IllegalArgumentException("한 번에 최대 100개까지 처리할 수 있습니다.");
+        }
+        return normalized;
+    }
+
+    private String normalizeDeleteReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("삭제 사유를 입력해 주세요.");
+        }
+        String normalized = reason.strip();
+        if (normalized.length() > 500) {
+            throw new IllegalArgumentException("삭제 사유는 500자 이내로 입력해 주세요.");
+        }
+        return normalized;
+    }
     private ConsentTemplateDetail find(UUID actorId, UUID templateId, UUID versionId) {
         try {
             ConsentTemplateDetail detail = repository.requireVersionForUpdate(actorId, templateId, versionId);
             if (!"ACTIVE".equals(detail.templateStatus())) {
-                throw new TemplateBusinessConflictException("비활성 템플릿은 처리할 수 없습니다.");
+                throw new TemplateBusinessConflictException("사용 중지된 동의서 양식은 처리할 수 없습니다.");
             }
             return detail;
         } catch (IllegalArgumentException exception) {
@@ -176,7 +227,7 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
             return policyQuery.findApprovedForTemplate(actorId,
                     detail.version().processingActivityVersionId());
         } catch (IllegalArgumentException exception) {
-            throw conflict("승인 처리업무 버전이 더 이상 유효하지 않습니다.", exception);
+            throw conflict("승인된 개인정보 이용 업무 버전이 더 이상 유효하지 않습니다.", exception);
         }
     }
 
@@ -210,9 +261,12 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
         }
         return java.util.stream.IntStream.range(0, commands.size()).mapToObj(index -> {
             ConsentItemDraftCommand item = commands.get(index);
+            UUID itemId = UUID.randomUUID();
+            String itemCode = "CI-" + itemId.toString().replace("-", "").substring(0, 16)
+                    .toUpperCase(java.util.Locale.ROOT);
             String retention = item.type() == ConsentItemType.THIRD_PARTY_PROVISION
                     ? item.retentionText() : policy.retentionDisplayText();
-            return new ConsentItemDefinition(UUID.randomUUID(), index + 1, item.code(), item.type(),
+            return new ConsentItemDefinition(itemId, index + 1, itemCode, item.type(),
                     item.title(), item.required(), item.purpose(), retention, item.refusalNotice(),
                     item.thirdPartyRecipient(), item.processingDataItemIds());
         }).toList();
@@ -227,16 +281,16 @@ public class ConsentTemplateManagementService implements ConsentTemplateManageme
         return sanitized;
     }
 
-    private static void validateIdentity(String code, String name) {
-        if (code == null || !TEMPLATE_CODE.matcher(code).matches()) {
-            throw new IllegalArgumentException("템플릿 코드는 영문 대문자, 숫자, 하이픈 2~30자로 입력해야 합니다.");
-        }
-        validateName(name);
+    private String generateTemplateCode(UUID templateId) {
+        String date = LocalDate.now(clock).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String randomPart = templateId.toString().replace("-", "").substring(0, 12)
+                .toUpperCase(Locale.ROOT);
+        return "CT-" + date + "-" + randomPart;
     }
 
     private static void validateName(String name) {
         if (name == null || name.isBlank() || name.strip().length() > 100) {
-            throw new IllegalArgumentException("템플릿 명칭은 1~100자로 입력해야 합니다.");
+            throw new IllegalArgumentException("양식 관리 명칭은 1~100자로 입력해야 합니다.");
         }
     }
 

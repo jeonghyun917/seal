@@ -12,10 +12,56 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class MailOutboxQueryServiceTest {
+
+    @Test
+    void pagedSearchPassesTrimmedQueryToScopedRepository() {
+        UUID actorId = UUID.randomUUID();
+        MailOutboxRepository repository = mock(MailOutboxRepository.class);
+        when(repository.search(actorId, MailOutboxStatus.QUEUED, "교육 동의", 21, 20))
+                .thenReturn(List.of());
+        MailOutboxQueryService service = new MailOutboxQueryService(repository, mock(PersonalDataCipher.class),
+                Clock.systemUTC(), noAudit());
+
+        service.searchPage(actorId, MailOutboxStatus.QUEUED, "  교육 동의  ", 2, 20);
+
+        verify(repository).search(actorId, MailOutboxStatus.QUEUED, "교육 동의", 21, 20);
+    }
+
+    @Test
+    void acceptedMailIncludesSmtpAcceptedTime() throws Exception {
+        UUID actorId = UUID.randomUUID();
+        UUID outboxId = UUID.randomUUID();
+        UUID organizationId = UUID.randomUUID();
+        Instant acceptedAt = Instant.parse("2026-08-28T05:48:00Z");
+        String html = "<p>메일</p>";
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(html.getBytes(StandardCharsets.UTF_8)));
+        MailOutboxRecord accepted = new MailOutboxRecord(outboxId, UUID.randomUUID(), UUID.randomUUID(),
+                organizationId, new byte[] {1}, new byte[] {2}, "key", "개인정보 동의", hash,
+                MailOutboxStatus.SMTP_ACCEPTED, Instant.parse("2026-08-28T05:46:00Z"), null,
+                acceptedAt, 1, null, 3);
+        MailOutboxRepository repository = mock(MailOutboxRepository.class);
+        when(repository.findScoped(actorId, outboxId)).thenReturn(Optional.of(accepted));
+        PersonalDataCipher cipher = mock(PersonalDataCipher.class);
+        when(cipher.decrypt(any(PersonalDataContext.class), any(EncryptedValue.class))).thenReturn(html);
+        MailOutboxQueryService service = new MailOutboxQueryService(repository, cipher,
+                Clock.fixed(acceptedAt, ZoneOffset.UTC), noAudit());
+
+        MailOutboxDetail detail = service.require(actorId, outboxId);
+
+        assertThat(detail.smtpAcceptedAt()).isEqualTo(acceptedAt);
+    }
 
     @Test
     void destroyedMailIsReturnedWithoutDecryptingRemovedBody() {
@@ -23,7 +69,8 @@ class MailOutboxQueryServiceTest {
         UUID outboxId = UUID.randomUUID();
         MailOutboxRecord destroyed = new MailOutboxRecord(outboxId, UUID.randomUUID(), UUID.randomUUID(),
                 UUID.randomUUID(), null, null, null, "개인정보 동의", null,
-                MailOutboxStatus.valueOf("DESTROYED"), Instant.parse("2026-08-25T00:00:00Z"), null, 1, null, 3);
+                MailOutboxStatus.valueOf("DESTROYED"), Instant.parse("2026-08-25T00:00:00Z"), null,
+                null, 1, null, 3);
         MailOutboxRepository repository = new MailOutboxRepository() {
             @Override public List<MailOutboxRecord> claimDue(Instant now, int limit, Instant leaseExpiredBefore) {
                 return List.of();

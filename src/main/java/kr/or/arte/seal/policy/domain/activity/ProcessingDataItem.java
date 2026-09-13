@@ -7,7 +7,7 @@ public record ProcessingDataItem(String itemName, String necessityReason, boolea
         }
         if (necessityReason == null || necessityReason.isBlank()
                 || necessityReason.strip().length() > 500) {
-            throw new IllegalArgumentException("개인정보 항목의 필요성 설명은 1~500자로 입력해야 합니다.");
+            throw new IllegalArgumentException("개인정보 항목의 필요한 이유는 1~500자로 입력해야 합니다.");
         }
         itemName = itemName.strip();
         necessityReason = necessityReason.strip();

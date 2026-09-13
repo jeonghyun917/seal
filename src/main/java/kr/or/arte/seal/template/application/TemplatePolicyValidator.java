@@ -14,7 +14,7 @@ public class TemplatePolicyValidator {
                                 ApprovedProcessingActivityReference policy) {
         if (!version.processingActivityId().equals(policy.activityId())
                 || !version.processingActivityVersionId().equals(policy.versionId())) {
-            throw new TemplateBusinessConflictException("승인 처리업무 버전이 변경되었습니다.");
+            throw new TemplateBusinessConflictException("승인된 개인정보 이용 업무 버전이 변경되었습니다.");
         }
         Set<UUID> approvedItemIds = new HashSet<>();
         policy.dataItems().forEach(item -> approvedItemIds.add(item.processingDataItemId()));
@@ -25,7 +25,7 @@ public class TemplatePolicyValidator {
             }
             if (!approvedItemIds.containsAll(item.processingDataItemIds())) {
                 throw new TemplateBusinessConflictException(
-                        "승인 처리업무와 일치하지 않는 개인정보 항목이 있습니다.");
+                        "승인된 개인정보 이용 업무와 일치하지 않는 개인정보 항목이 있습니다.");
             }
             if (item.type() != ConsentItemType.THIRD_PARTY_PROVISION
                     && !item.retentionText().equals(policy.retentionDisplayText())) {

@@ -24,8 +24,8 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
     @Override
     @Transactional
     public void insertTemplate(ConsentTemplateDetail detail, UUID actorId, Instant now) {
-        requireOne(mapper.insertTemplate(detail, actorId, now), "템플릿을 생성할 수 없습니다.");
-        requireOne(mapper.insertVersion(detail.version(), actorId, now), "템플릿 초안을 생성할 수 없습니다.");
+        requireOne(mapper.insertTemplate(detail, actorId, now), "동의서 양식을 생성할 수 없습니다.");
+        requireOne(mapper.insertVersion(detail.version(), actorId, now), "동의서 양식 초안을 생성할 수 없습니다.");
         insertItems(detail.version());
     }
 
@@ -43,7 +43,7 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
 
     private ConsentTemplateDetail load(List<ConsentTemplateHeaderRow> rows, UUID versionId) {
         if (rows.size() != 1) {
-            throw new IllegalArgumentException("동의서 템플릿을 찾을 수 없습니다.");
+            throw new IllegalArgumentException("동의서 양식을 찾을 수 없습니다.");
         }
         ConsentTemplateHeaderRow row = rows.get(0);
         Map<UUID, List<UUID>> selections = mapper.findSelections(versionId).stream()
@@ -78,7 +78,7 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
     public void updateTemplateName(UUID templateId, String templateName, long versionNo,
                                    UUID actorId, Instant now) {
         requireOne(mapper.updateTemplateName(templateId, templateName, versionNo, actorId, now),
-                "다른 사용자가 템플릿 기본정보를 변경했습니다.");
+                "다른 사용자가 동의서 양식 기본정보를 변경했습니다.");
     }
 
     @Override
@@ -131,9 +131,20 @@ public class MyBatisConsentTemplateRepository implements ConsentTemplateReposito
     public void updateStatus(UUID templateId, String status, long versionNo,
                              UUID actorId, Instant now) {
         requireOne(mapper.updateStatus(templateId, status, versionNo, actorId, now),
-                "다른 사용자가 템플릿 상태를 변경했습니다.");
+                "다른 사용자가 동의서 양식 상태를 변경했습니다.");
     }
 
+    @Override
+    @Transactional
+    public int softDelete(List<UUID> templateIds, String reason, UUID actorId, Instant now) {
+        return mapper.softDelete(templateIds, reason, actorId, now);
+    }
+
+    @Override
+    @Transactional
+    public int restore(List<UUID> templateIds, UUID actorId, Instant now) {
+        return mapper.restore(templateIds, actorId, now);
+    }
     private void insertItems(ConsentTemplateVersion version) {
         mapper.insertItems(version.consentTemplateVersionId(), version.processingActivityVersionId(),
                 version.items());

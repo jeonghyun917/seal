@@ -125,9 +125,11 @@
         SELECT activity.processing_activity_id AS activity_id,
                version.processing_activity_version_id AS version_id,
                activity.owner_organization_unit_id AS owner_organization_id,
-               activity.activity_name, version.processing_purpose,
+               activity.activity_code, activity.activity_name, version.processing_purpose,
                version.legal_basis_type, version.retention_policy_version_id,
                (CASE retention_version.start_event
+                    WHEN 'MAIL_FIRST_SENT_AT' THEN '메일 최초 발송 후 '
+                    WHEN 'REQUEST_EXPIRES_AT' THEN '동의 요청 만료 후 '
                     WHEN 'CONSENT_SUBMITTED_AT' THEN '동의 제출 후 '
                     WHEN 'REQUEST_COMPLETED_AT' THEN '업무 요청 완료 후 '
                     WHEN 'PROGRAM_END_AT' THEN '프로그램 종료 후 '
@@ -165,14 +167,28 @@
          ORDER BY activity.activity_code
     </select>
 
+    <select id="searchApprovedForTemplate" resultType="kr.or.arte.seal.policy.persistence.activity.ApprovedProcessingActivityRow">
+        <include refid="visibleScope"/>
+        <include refid="approvedTemplateActivitySelect"/>
+        <if test="keyword != null and keyword != ''">
+           AND (activity.activity_code ILIKE CONCAT('%', #{keyword}, '%')
+             OR activity.activity_name ILIKE CONCAT('%', #{keyword}, '%')
+             OR version.processing_purpose ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+         ORDER BY activity.activity_name, activity.activity_code
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+
     <select id="findReferenceForExistingTemplate" resultType="kr.or.arte.seal.policy.persistence.activity.ApprovedProcessingActivityRow">
         <include refid="visibleScope"/>
         SELECT activity.processing_activity_id AS activity_id,
                version.processing_activity_version_id AS version_id,
                activity.owner_organization_unit_id AS owner_organization_id,
-               activity.activity_name, version.processing_purpose,
+               activity.activity_code, activity.activity_name, version.processing_purpose,
                version.legal_basis_type, version.retention_policy_version_id,
                (CASE retention_version.start_event
+                    WHEN 'MAIL_FIRST_SENT_AT' THEN '메일 최초 발송 후 '
+                    WHEN 'REQUEST_EXPIRES_AT' THEN '동의 요청 만료 후 '
                     WHEN 'CONSENT_SUBMITTED_AT' THEN '동의 제출 후 '
                     WHEN 'REQUEST_COMPLETED_AT' THEN '업무 요청 완료 후 '
                     WHEN 'PROGRAM_END_AT' THEN '프로그램 종료 후 '

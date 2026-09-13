@@ -1,12 +1,12 @@
 package kr.or.arte.seal.recipient.web;
 
 import jakarta.validation.Valid;
-import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.recipient.application.CreateRecipientCommand;
 import kr.or.arte.seal.recipient.application.DuplicateRecipientException;
 import kr.or.arte.seal.recipient.application.RecipientDetail;
 import kr.or.arte.seal.recipient.application.RecipientManagementService;
+import kr.or.arte.seal.recipient.application.RecipientInstitution;
 import kr.or.arte.seal.recipient.application.RecipientQueryService;
 import kr.or.arte.seal.recipient.application.UpdateRecipientCommand;
 import kr.or.arte.seal.recipient.domain.RecipientStatus;
@@ -27,23 +27,22 @@ import java.util.UUID;
 public class RecipientController {
     private final RecipientManagementService management;
     private final RecipientQueryService query;
-    private final OrganizationManagement organizations;
 
-    public RecipientController(RecipientManagementService management, RecipientQueryService query,
-                               OrganizationManagement organizations) {
+    public RecipientController(RecipientManagementService management, RecipientQueryService query) {
         this.management = management;
         this.query = query;
-        this.organizations = organizations;
     }
 
     @GetMapping("/admin/recipients")
     @PreAuthorize("hasAuthority('RECIPIENT_VIEW')")
     public String list(@RequestParam(required = false) String email,
+            @RequestParam(required = false) String collectionBasis,
             @RequestParam(required = false) RecipientStatus status,
             @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
-        var pageResult=query.searchPage(principal.adminUserId(),email,status,page,20); model.addAttribute("recipients",pageResult.items()); model.addAttribute("pageResult",pageResult);
+        var pageResult=query.searchPage(principal.adminUserId(),email,collectionBasis,status,page,20); model.addAttribute("recipients",pageResult.items()); model.addAttribute("pageResult",pageResult);
         model.addAttribute("email", email);
+        model.addAttribute("collectionBasis", collectionBasis);
         model.addAttribute("selectedStatus", status);
         return "admin/recipients/list";
     }
@@ -51,7 +50,9 @@ public class RecipientController {
     @GetMapping("/admin/recipients/new")
     @PreAuthorize("hasAuthority('RECIPIENT_EDIT')")
     public String createForm(@AuthenticationPrincipal AdminPrincipal principal, Model model) {
-        model.addAttribute("recipientForm", new RecipientForm());
+        RecipientForm form = new RecipientForm();
+        form.setOrganizationUnitId(RecipientInstitution.ORGANIZATION_UNIT_ID);
+        model.addAttribute("recipientForm", form);
         populate(principal, model, false, null);
         return "admin/recipients/form";
     }
@@ -67,7 +68,7 @@ public class RecipientController {
         }
         try {
             UUID id = management.create(new CreateRecipientCommand(principal.adminUserId(),
-                    form.getOrganizationUnitId(), form.getName(), form.getEmail(), form.getCollectionBasis()));
+                    RecipientInstitution.ORGANIZATION_UNIT_ID, form.getAffiliationName(), form.getJobTitle(), form.getName(), form.getEmail(), form.getCollectionBasis()));
             return "redirect:/admin/recipients/" + id + "?created";
         } catch (DuplicateRecipientException exception) {
             result.rejectValue("email", "duplicate", exception.getMessage());
@@ -91,7 +92,9 @@ public class RecipientController {
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         RecipientDetail detail = query.find(principal.adminUserId(), recipientId);
         RecipientForm form = new RecipientForm();
-        form.setOrganizationUnitId(detail.organizationUnitId());
+        form.setOrganizationUnitId(RecipientInstitution.ORGANIZATION_UNIT_ID);
+        form.setAffiliationName(detail.affiliationName());
+        form.setJobTitle(detail.jobTitle());
         form.setCollectionBasis(detail.collectionBasis());
         form.setVersionNo(detail.versionNo());
         model.addAttribute("recipientForm", form);
@@ -109,7 +112,7 @@ public class RecipientController {
             return "admin/recipients/form";
         }
         try {
-            management.update(recipientId, new UpdateRecipientCommand(principal.adminUserId(),
+            management.update(recipientId, new UpdateRecipientCommand(principal.adminUserId(), form.getAffiliationName(),
                     form.getName(), form.getEmail(), form.getCollectionBasis(), form.getVersionNo()));
             return "redirect:/admin/recipients/" + recipientId + "?updated";
         } catch (DuplicateRecipientException exception) {
@@ -129,7 +132,7 @@ public class RecipientController {
 
     private void populate(AdminPrincipal principal, Model model, boolean editing, RecipientDetail detail) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("organizations", organizations.findVisibleOrganizations(principal.adminUserId()));
+        model.addAttribute("institutionName", RecipientInstitution.ORGANIZATION_NAME);
         model.addAttribute("editing", editing);
         model.addAttribute("recipient", detail);
     }

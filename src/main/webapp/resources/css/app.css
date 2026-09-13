@@ -138,6 +138,22 @@ a {
     background: #eef3fa;
 }
 
+/* Compact the administrator workspace without browser-level scaling. */
+.admin-body {
+    --admin-control-min-size: 44px;
+    font-size: 0.9rem;
+}
+
+.admin-body .admin-header button:not(.field-guide-trigger),
+.admin-body .admin-layout button:not(.field-guide-trigger),
+.admin-body .admin-layout input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.admin-body .admin-layout select,
+.admin-body .admin-layout textarea,
+.admin-body .admin-layout .primary-button,
+.admin-body .admin-layout .secondary-button {
+    min-height: var(--admin-control-min-size);
+}
+
 .auth-shell {
     display: grid;
     grid-template-columns: minmax(0, 1.15fr) minmax(400px, 0.85fr);
@@ -145,14 +161,38 @@ a {
     min-height: 100vh;
     margin: 0 auto;
     align-items: center;
-    gap: clamp(48px, 8vw, 110px);
+    gap: clamp(36px, 5vw, 72px);
     padding: 64px 0;
+}
+
+.institution-brand {
+    display: block;
+    width: min(220px, 100%);
+    margin-bottom: 2px;
+    text-decoration: none;
+}
+
+.institution-brand img {
+    display: block;
+    width: 100%;
+    height: auto;
 }
 
 .auth-intro h1 {
     color: #112541;
-    font-size: clamp(2.4rem, 5vw, 4.6rem);
-    letter-spacing: -0.045em;
+    letter-spacing: -0.035em;
+    line-height: 1.16;
+}
+
+.auth-intro h1 span,
+.auth-intro h1 strong {
+    display: block;
+    font-size: clamp(2.35rem, 3.65vw, 3.25rem);
+    font-weight: 750;
+}
+
+.auth-intro h1 strong {
+    margin-top: 4px;
 }
 
 .brand-mark,
@@ -374,6 +414,12 @@ a {
     align-self: start;
     height: 100vh;
     overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.admin-nav::-webkit-scrollbar {
+    display: none;
 }
 
 .admin-nav a,
@@ -529,8 +575,14 @@ a {
         padding: 38px 0;
     }
 
-    .auth-intro h1 {
-        font-size: 2.5rem;
+    .institution-brand {
+        width: min(220px, 100%);
+        margin-bottom: 2px;
+    }
+
+    .auth-intro h1 span,
+    .auth-intro h1 strong {
+        font-size: clamp(2.15rem, 8vw, 2.75rem);
     }
 
     .admin-layout {
@@ -578,5 +630,387 @@ a {
 
     .detail-list {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Contextual writing guide for administrator input fields. */
+.field-guide-label-line {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-width: 0;
+}
+
+.field-guide-generated-label {
+    display: inline-flex;
+    align-items: center;
+    color: #334155;
+    font-weight: 700;
+}
+
+.data-item-row > label:not(.check-label) {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    color: #334155;
+    font-weight: 700;
+}
+
+.data-item-row > .check-label {
+    display: flex;
+    grid-template-columns: none;
+}
+
+.field-guide {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.field-guide-trigger {
+    display: inline-grid;
+    place-items: center;
+    width: 19px;
+    height: 19px;
+    padding: 0;
+    border: 1px solid #6f91c4;
+    border-radius: 50%;
+    color: #245da8;
+    background: #f3f7fd;
+    font: 800 0.72rem/1 Arial, sans-serif;
+    cursor: help;
+}
+
+.field-guide-trigger:hover,
+.field-guide-trigger:focus-visible {
+    color: #fff;
+    border-color: #245da8;
+    background: #245da8;
+    outline: none;
+}
+
+.field-guide-trigger:focus-visible {
+    box-shadow: 0 0 0 3px rgba(36, 93, 168, 0.22);
+}
+
+.field-guide-tooltip {
+    position: absolute;
+    z-index: 1000;
+    top: calc(100% + 9px);
+    left: 0;
+    display: none;
+    width: min(340px, calc(100vw - 32px));
+    gap: 7px;
+    padding: 14px 15px;
+    border: 1px solid #b8c9df;
+    border-radius: 10px;
+    color: #253851;
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(23, 54, 97, 0.18);
+    font-size: 0.82rem;
+    font-weight: 400;
+    line-height: 1.55;
+    text-align: left;
+    white-space: normal;
+    pointer-events: none;
+}
+
+.field-guide-tooltip::before {
+    position: absolute;
+    top: -6px;
+    left: 10px;
+    width: 10px;
+    height: 10px;
+    border-top: 1px solid #b8c9df;
+    border-left: 1px solid #b8c9df;
+    background: #fff;
+    content: "";
+    transform: rotate(45deg);
+}
+
+.field-guide-tooltip strong {
+    color: #174f96;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+
+.field-guide-example {
+    padding-top: 7px;
+    border-top: 1px solid #e3eaf3;
+    color: #526a89;
+}
+
+.field-guide:focus-within .field-guide-tooltip,
+.field-guide.is-open .field-guide-tooltip {
+    display: grid;
+}
+
+@media (hover: hover) {
+    .field-guide:hover .field-guide-tooltip {
+        display: grid;
+    }
+}
+
+.field-guide.align-right .field-guide-tooltip {
+    right: 0;
+    left: auto;
+}
+
+.field-guide.align-right .field-guide-tooltip::before {
+    right: 5px;
+    left: auto;
+}
+
+@media (max-width: 640px) {
+    .field-guide-tooltip {
+        position: fixed;
+        top: auto;
+        right: 16px;
+        bottom: 20px;
+        left: 16px;
+        width: auto;
+        max-height: 45vh;
+        overflow-y: auto;
+        pointer-events: auto;
+    }
+
+    .field-guide-tooltip::before {
+        display: none;
+    }
+}
+/* Shared administrator layout and accessibility refinements. */
+.skip-link {
+    position: fixed;
+    z-index: 1400;
+    top: 8px;
+    left: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    color: #fff;
+    background: #123b73;
+    font-weight: 800;
+    text-decoration: none;
+    transform: translateY(-150%);
+    transition: transform 0.16s ease;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+}
+
+.admin-menu-button {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    min-width: 72px;
+    padding: 0 12px;
+    border: 1px solid #cbd6e5;
+    border-radius: 8px;
+    color: #243a58;
+    background: #fff;
+    font-weight: 800;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.admin-menu-icon,
+.admin-menu-icon::before,
+.admin-menu-icon::after {
+    display: block;
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: currentColor;
+    content: "";
+}
+
+.admin-menu-icon {
+    position: relative;
+}
+
+.admin-menu-icon::before {
+    position: absolute;
+    top: -6px;
+}
+
+.admin-menu-icon::after {
+    position: absolute;
+    top: 6px;
+}
+
+.admin-layout {
+    grid-template-columns: 208px minmax(0, 1fr);
+}
+
+.admin-main {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    padding: 34px clamp(22px, 3vw, 48px) 56px;
+}
+
+.page-heading-row h1 {
+    font-size: 1.8rem;
+    text-wrap: balance;
+}
+
+.work-panel {
+    padding: 22px;
+}
+
+.admin-body .section-kicker,
+.admin-body .nav-group,
+.admin-body .card-number,
+.admin-body .evidence-panel-kicker,
+.admin-body .activity-dialog-shell > header span,
+.admin-body .recipient-dialog-shell > header span,
+.admin-body .statistics-donut-total span,
+.admin-body .destruction-method-grid h2 span {
+    font-size: 0.75rem;
+}
+
+.admin-body dialog {
+    overscroll-behavior: contain;
+}
+
+.admin-body form.is-submitting button[aria-disabled="true"] {
+    pointer-events: none;
+    cursor: wait;
+    opacity: 0.72;
+}
+
+@media (max-width: 900px) {
+    .admin-header {
+        /* The desktop grid must not override the drawer layout. */
+        position: sticky;
+        z-index: 1000;
+        top: 0;
+    }
+
+    .admin-menu-button {
+        display: inline-flex;
+    }
+
+    .admin-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-nav {
+        position: fixed;
+        z-index: 1200;
+        inset: 0 auto 0 0;
+        display: flex;
+        flex-direction: column;
+        width: min(320px, calc(100vw - 48px));
+        height: 100dvh;
+        padding: 72px 18px 28px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border-right: 0;
+        box-shadow: 18px 0 44px rgba(11, 28, 53, 0.28);
+        white-space: normal;
+        transform: translateX(-105%);
+        transition: transform 0.2s ease;
+    }
+
+    .admin-nav-open .admin-nav {
+        transform: translateX(0);
+    }
+
+    .admin-body::before {
+        position: fixed;
+        z-index: 1100;
+        inset: 0;
+        visibility: hidden;
+        background: rgba(10, 25, 48, 0.48);
+        opacity: 0;
+        content: "";
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    .admin-body.admin-nav-open {
+        overflow: hidden;
+    }
+
+    .admin-body.admin-nav-open::before {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .nav-group {
+        display: block;
+    }
+}
+
+@media (max-width: 640px) {
+    .admin-header {
+        align-items: center;
+    }
+
+    .admin-main {
+        padding: 24px 14px 44px;
+    }
+
+    .work-panel {
+        padding: 18px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skip-link,
+    .admin-nav,
+    .admin-body::before {
+        transition: none;
+    }
+}
+.admin-main:focus {
+    outline: none;
+}
+
+/* Confirmations overlay the page without moving the form grid. */
+.admin-confirm {
+    width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 48px);
+    overflow: auto; padding: 28px; border: 1px solid #cfdaeb; border-radius: 16px;
+    color: #172b48; background: #fff; box-shadow: 0 24px 64px rgba(15, 35, 65, .22);
+}
+.admin-confirm::backdrop { background: rgba(10, 25, 48, .48); }
+.admin-confirm p { white-space: pre-line; line-height: 1.7; overflow-wrap: anywhere; }
+.danger-button {
+    min-height: 44px; padding: 10px 18px; border: 1px solid #a31e32;
+    border-radius: 10px; background: #a31e32; color: #fff;
+    font: inherit; font-weight: 700; cursor: pointer;
+}
+.danger-button:focus-visible { outline: 3px solid #f9b84a; outline-offset: 3px; }
+.field-guide-trigger { position: relative; }
+.field-guide-trigger::before { content: ""; position: absolute; inset: -10px; }
+.simple-editor-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.simple-editor-toolbar button { padding: 8px 14px; }
+.simple-editor {
+    min-height: 150px; padding: 14px; border: 1px solid #b8cce8;
+    border-radius: 10px; background: #fff; line-height: 1.7; overflow-wrap: anywhere;
+}
+.simple-editor:focus-visible { outline: 2px solid #2461df; outline-offset: 2px; }
+.simple-editor p { margin: 0 0 10px; }
+
+.admin-nav-close {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(220, 231, 246, 0.5);
+    border-radius: 8px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .admin-nav-close {
+        display: inline-flex;
     }
 }

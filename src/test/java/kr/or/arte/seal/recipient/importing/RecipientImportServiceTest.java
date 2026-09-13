@@ -36,13 +36,16 @@ class RecipientImportServiceTest {
                 command -> {}, Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), ZoneOffset.UTC),
                 new RecipientImportProperties(1_000, 5 * 1024 * 1024));
 
-        RecipientImportPreview preview = service.validate(ACTOR, ORG, "정당한 대상자 반입 근거", workbook());
+        RecipientImportPreview preview = service.validate(ACTOR, ORG, workbook());
         RecipientImportResult result = service.confirm(ACTOR, preview.batchId());
 
         assertThat(preview.validCount()).isEqualTo(1);
         assertThat(result.importedCount()).isEqualTo(1);
         assertThat(repository.rows.get(0).nameCiphertext()).isNull();
         assertThat(repository.rows.get(0).status()).isEqualTo(RecipientImportRowStatus.IMPORTED);
+        assertThat(repository.inserted.affiliationName()).isEqualTo("외부회사 주식회사");
+        assertThat(repository.inserted.jobTitle()).isEqualTo("교육팀장");
+        assertThat(repository.inserted.collectionBasis()).isEqualTo("2026년 교육 신청서 접수");
     }
 
     @Test
@@ -54,7 +57,7 @@ class RecipientImportServiceTest {
                 content -> MalwareScanResult.DISABLED, cipher, new HmacEmailLookupHasher(key), command -> {},
                 Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), ZoneOffset.UTC),
                 new RecipientImportProperties(1_000, 5 * 1024 * 1024));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.validate(ACTOR, ORG, "정당한 반입 근거", workbook()))
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.validate(ACTOR, ORG, workbook()))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         repository.expired = 2;
         assertThat(service.expireDue(10)).isEqualTo(2);
@@ -62,21 +65,21 @@ class RecipientImportServiceTest {
 
     private static byte[] workbook() throws Exception {
         try (var book = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
-            var sheet=book.createSheet("대상자"); var h=sheet.createRow(0);
-            h.createCell(0).setCellValue("이름"); h.createCell(1).setCellValue("이메일");
-            var r=sheet.createRow(1); r.createCell(0).setCellValue("김예술"); r.createCell(1).setCellValue("artist@example.com");
+            var sheet=book.createSheet("수신자"); var h=sheet.createRow(0);
+            h.createCell(0).setCellValue("수신자 소속기관"); h.createCell(1).setCellValue("수신자 직책"); h.createCell(2).setCellValue("이름"); h.createCell(3).setCellValue("이메일"); h.createCell(4).setCellValue("수신자 정보 등록 근거");
+            var r=sheet.createRow(1); r.createCell(0).setCellValue("외부회사 주식회사"); r.createCell(1).setCellValue("교육팀장"); r.createCell(2).setCellValue("김예술"); r.createCell(3).setCellValue("artist@example.com"); r.createCell(4).setCellValue("2026년 교육 신청서 접수");
             book.write(output); return output.toByteArray();
         }
     }
 
     private static final class FakeRepository implements RecipientImportRepository {
-        RecipientImportBatchRecord batch; final List<RecipientImportRowRecord> rows=new ArrayList<>();boolean access=true;int expired;
+        RecipientImportBatchRecord batch; RecipientStoredRecord inserted; final List<RecipientImportRowRecord> rows=new ArrayList<>();boolean access=true;int expired;
         public boolean canAccessOrganization(UUID actorId, UUID orgId){return access;}
         public boolean activeEmailExists(UUID orgId,String hmac){return false;}
         public void insertBatch(RecipientImportBatchRecord value,List<RecipientImportRowRecord> values){batch=value;rows.addAll(values);}
         public Optional<RecipientImportBatchRecord> findScopedForUpdate(UUID actorId,UUID batchId){return Optional.of(batch);}
         public List<RecipientImportRowRecord> findRows(UUID batchId){return List.copyOf(rows);}
-        public UUID insertRecipientFromImport(RecipientStoredRecord row,UUID actor,Instant now){return row.recipientId();}
+        public UUID insertRecipientFromImport(RecipientStoredRecord row,UUID actor,Instant now){inserted=row;return row.recipientId();}
         public void markImported(UUID batchId,int row,UUID recipientId){int i=row-2;rows.set(i,rows.get(i).imported(recipientId));}
         public void complete(UUID batchId,int count,Instant now){batch=batch.completed(count,now);}
         public int expireDue(Instant now,int limit){return expired;}

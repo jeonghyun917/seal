@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -61,9 +62,9 @@ class ConsentTemplateManagementServiceTest {
     @Test
     void createDerivesRetentionTextFromApprovedPolicy() {
         UUID createdId = service.create(new CreateConsentTemplateCommand(
-                "TPL-EDU", "교육 프로그램 동의서", ACTIVITY_VERSION_ID,
+                "교육 프로그램 동의서", ACTIVITY_VERSION_ID,
                 "교육 프로그램 개인정보 동의서", "<p>개인정보 처리 내용을 확인해 주세요.</p>",
-                List.of(new ConsentItemDraftCommand("COLLECT", ConsentItemType.COLLECTION_USE,
+                List.of(new ConsentItemDraftCommand(ConsentItemType.COLLECTION_USE,
                         "개인정보 수집 이용 동의", true, "교육 프로그램 운영 목적",
                         "사용자 입력은 무시", "동의를 거부하면 신청이 제한될 수 있습니다.",
                         null, List.of(DATA_ITEM_ID))), AUTHOR));
@@ -76,13 +77,47 @@ class ConsentTemplateManagementServiceTest {
     }
 
     @Test
+    void createGeneratesTemplateCode() {
+        service.create(new CreateConsentTemplateCommand(
+                "교육 프로그램 동의서", ACTIVITY_VERSION_ID,
+                "교육 프로그램 개인정보 동의서", "<p>개인정보 처리 내용을 확인해 주세요.</p>",
+                List.of(new ConsentItemDraftCommand(ConsentItemType.COLLECTION_USE,
+                        "개인정보 수집 이용 동의", true, "교육 프로그램 운영 목적",
+                        null, "동의를 거부하면 신청이 제한될 수 있습니다.",
+                        null, List.of(DATA_ITEM_ID))), AUTHOR));
+
+        ArgumentCaptor<ConsentTemplateDetail> detailCaptor =
+                ArgumentCaptor.forClass(ConsentTemplateDetail.class);
+        then(repository).should().insertTemplate(detailCaptor.capture(), any(), any());
+        assertThat(detailCaptor.getValue().templateCode())
+                .matches("CT-20260824-[A-F0-9]{12}");
+    }
+
+    @Test
+    void createGeneratesConsentItemCodeWhenUserDoesNotProvideOne() {
+        assertThatCode(() -> service.create(new CreateConsentTemplateCommand(
+                "교육 프로그램 동의서", ACTIVITY_VERSION_ID,
+                "교육 프로그램 개인정보 동의서", "<p>개인정보 처리 내용을 확인해 주세요.</p>",
+                List.of(new ConsentItemDraftCommand(ConsentItemType.COLLECTION_USE,
+                        "개인정보 수집 이용 동의", true, "교육 프로그램 운영 목적",
+                        null, "동의를 거부하면 신청이 제한될 수 있습니다.",
+                        null, List.of(DATA_ITEM_ID))), AUTHOR))).doesNotThrowAnyException();
+
+        ArgumentCaptor<ConsentTemplateDetail> detailCaptor =
+                ArgumentCaptor.forClass(ConsentTemplateDetail.class);
+        then(repository).should().insertTemplate(detailCaptor.capture(), any(), any());
+        assertThat(detailCaptor.getValue().version().items()).singleElement()
+                .satisfies(item -> assertThat(item.code()).matches("CI-[A-F0-9]{16}"));
+    }
+
+    @Test
     void reviewRequestRejectsDataItemOutsideApprovedActivity() {
         ConsentTemplateDetail detail = detail(draftWithDataItem(UUID.randomUUID()));
         given(repository.requireVersionForUpdate(AUTHOR, TEMPLATE_ID, VERSION_ID)).willReturn(detail);
 
         assertThatThrownBy(() -> service.requestReview(TEMPLATE_ID, VERSION_ID, AUTHOR))
                 .isInstanceOf(TemplateBusinessConflictException.class)
-                .hasMessage("승인 처리업무와 일치하지 않는 개인정보 항목이 있습니다.");
+                .hasMessage("승인된 개인정보 이용 업무와 일치하지 않는 개인정보 항목이 있습니다.");
     }
 
     @Test
@@ -142,10 +177,52 @@ class ConsentTemplateManagementServiceTest {
     }
 
     @Test
+    void bulkDeleteNormalizesSelectionAndWritesAuditPerTemplate() {
+        UUID secondTemplateId = UUID.fromString("21000000-0000-0000-0000-000000000002");
+        given(repository.softDelete(List.of(TEMPLATE_ID, secondTemplateId), "중복 템플릿 정리",
+                AUTHOR, NOW)).willReturn(2);
+
+        service.deleteTemplates(List.of(TEMPLATE_ID, secondTemplateId, TEMPLATE_ID),
+                "  중복 템플릿 정리  ", AUTHOR);
+
+        then(repository).should().softDelete(List.of(TEMPLATE_ID, secondTemplateId),
+                "중복 템플릿 정리", AUTHOR, NOW);
+        then(auditWriter).should(org.mockito.Mockito.times(2)).append(any());
+    }
+
+    @Test
+    void bulkDeleteRejectsEmptySelection() {
+        assertThatThrownBy(() -> service.deleteTemplates(List.of(), null, AUTHOR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("삭제할 동의서 양식을 선택해 주세요.");
+
+        then(repository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void bulkDeleteRequiresReason() {
+        assertThatThrownBy(() -> service.deleteTemplates(List.of(TEMPLATE_ID), "   ", AUTHOR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("삭제 사유를 입력해 주세요.");
+
+        then(repository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void bulkRestoreRequiresEverySelectedTemplateToBeRestorable() {
+        UUID secondTemplateId = UUID.fromString("21000000-0000-0000-0000-000000000002");
+        given(repository.restore(List.of(TEMPLATE_ID, secondTemplateId), AUTHOR, NOW)).willReturn(1);
+
+        assertThatThrownBy(() -> service.restoreTemplates(
+                List.of(TEMPLATE_ID, secondTemplateId), AUTHOR))
+                .isInstanceOf(TemplateBusinessConflictException.class)
+                .hasMessage("선택한 동의서 양식 중 복구할 수 없는 항목이 있습니다.");
+    }
+    @Test
     void rejectsUnknownTemplateStatus() {
         assertThatThrownBy(() -> service.updateStatus(TEMPLATE_ID, "DELETED", 0, AUTHOR))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("템플릿 상태가 올바르지 않습니다.");
+                .hasMessage("동의서 양식 상태가 올바르지 않습니다.");
     }
 
     private ConsentTemplateDetail detail(ConsentTemplateVersion version) {
@@ -166,7 +243,7 @@ class ConsentTemplateManagementServiceTest {
 
     private ApprovedProcessingActivityReference reference() {
         return new ApprovedProcessingActivityReference(ACTIVITY_ID, ACTIVITY_VERSION_ID,
-                UUID.randomUUID(), "교육 프로그램 운영", "교육 프로그램 운영 목적",
+                UUID.randomUUID(), "PA-EDU", "교육 프로그램 운영", "교육 프로그램 운영 목적",
                 "CONSENT", UUID.randomUUID(), "동의 제출 후 3년",
                 List.of(new ApprovedDataItemReference(DATA_ITEM_ID, 1, "이메일", true)));
     }

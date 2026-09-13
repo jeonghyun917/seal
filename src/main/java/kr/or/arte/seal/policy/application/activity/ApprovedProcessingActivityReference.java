@@ -7,6 +7,7 @@ public record ApprovedProcessingActivityReference(
         UUID activityId,
         UUID versionId,
         UUID ownerOrganizationId,
+        String activityCode,
         String activityName,
         String processingPurpose,
         String legalBasisType,

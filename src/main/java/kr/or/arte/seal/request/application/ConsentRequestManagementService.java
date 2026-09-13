@@ -14,10 +14,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -50,7 +53,7 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
     @Transactional
     public ConsentRequestCreateResult create(UUID actorId, CreateConsentRequestCommand command) {
         require(command.organizationUnitId(), "조직"); require(command.recipientId(), "대상자");
-        require(command.templateVersionId(), "템플릿 버전"); require(command.idempotencyKey(), "멱등키");
+        require(command.templateVersionId(), "동의서 양식 버전"); require(command.idempotencyKey(), "멱등키");
         if (command.expiresAt() == null || !command.expiresAt().isAfter(clock.instant())) {
             throw new IllegalArgumentException("만료일시는 현재 이후여야 합니다.");
         }
@@ -75,6 +78,25 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         repository.insertEvent(row.requestId(), "CREATED", "ADMIN", actorId, null, clock.instant());
         audit("CONSENT_REQUEST_CREATE", row, actorId, null);
         return result(row, false);
+    }
+
+    @Override
+    @Transactional
+    public List<ConsentRequestCreateResult> createBatch(UUID actorId, CreateConsentRequestBatchCommand command) {
+        require(command.templateVersionId(), "동의서 양식 버전");
+        require(command.idempotencyKey(), "멱등키");
+        if (command.recipientIds() == null || command.recipientIds().isEmpty()) {
+            throw new IllegalArgumentException("동의 수신자를 한 명 이상 선택해 주세요.");
+        }
+        var recipientIds = new LinkedHashSet<>(command.recipientIds());
+        if (recipientIds.contains(null)) throw new IllegalArgumentException("동의 수신자 선택값이 올바르지 않습니다.");
+        return recipientIds.stream().map(recipientId -> {
+            var recipient = recipients.findScoped(actorId, recipientId).orElseThrow(RequestNotFoundException::new);
+            UUID recipientKey = UUID.nameUUIDFromBytes((command.idempotencyKey() + ":" + recipientId)
+                    .getBytes(StandardCharsets.UTF_8));
+            return create(actorId, new CreateConsentRequestCommand(recipient.organizationUnitId(), recipientId,
+                    command.templateVersionId(), command.expiresAt(), recipientKey));
+        }).toList();
     }
 
     @Override

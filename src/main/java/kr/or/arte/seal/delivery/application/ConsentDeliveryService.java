@@ -103,7 +103,7 @@ public class ConsentDeliveryService {
         var row = new MailOutboxRecord(outboxId, request.requestId(),
                 Objects.requireNonNull(issued.linkId()), request.organizationUnitId(),
                 email.bytes(), html.bytes(), email.keyId(), mail.subject(), mail.sha256(),
-                MailOutboxStatus.QUEUED, sendAt, sendAt, 0, null, 0);
+                MailOutboxStatus.QUEUED, sendAt, sendAt, null, 0, null, 0);
         outbox.insert(row, actorId, now);
         audit.append(new AuditEventCommand(now, "ADMIN", actorId, "MAIL_OUTBOX_CREATE",
                 "MAIL_OUTBOX", outboxId.toString(), "SUCCESS", null, UUID.randomUUID(),

@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.List;
 import java.util.UUID;
 
 @Controller
@@ -58,7 +59,7 @@ public class RetentionPolicyController {
             return "admin/retention-policies/form";
         }
         UUID policyId = managementService.create(new RetentionPolicyCreateCommand(
-                form.getPolicyCode(), form.getPolicyName(), form.getOwnerOrganizationUnitId(),
+                form.getPolicyName(), form.getOwnerOrganizationUnitId(),
                 form.getStartEvent(), form.getPeriodValue(), form.getPeriodUnit(),
                 form.getGracePeriodDays(), form.getDestructionMethod(), principal.adminUserId()));
         return "redirect:/admin/retention-policies/" + policyId + "?created";
@@ -102,7 +103,10 @@ public class RetentionPolicyController {
         model.addAttribute("administrator", principal);
         model.addAttribute("organizations",
                 organizationManagement.findVisibleOrganizations(principal.adminUserId()));
-        model.addAttribute("startEvents", RetentionStartEvent.values());
+        model.addAttribute("startEvents", List.of(
+                RetentionStartEvent.MAIL_FIRST_SENT_AT,
+                RetentionStartEvent.REQUEST_EXPIRES_AT,
+                RetentionStartEvent.CONSENT_SUBMITTED_AT));
         model.addAttribute("periodUnits", RetentionPeriodUnit.values());
         model.addAttribute("destructionMethods", DestructionMethod.values());
     }

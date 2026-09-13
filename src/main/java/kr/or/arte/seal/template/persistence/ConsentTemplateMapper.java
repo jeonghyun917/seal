@@ -55,4 +55,8 @@ public interface ConsentTemplateMapper {
     int updateStatus(@Param("templateId") UUID templateId, @Param("status") String status,
                      @Param("versionNo") long versionNo, @Param("actorId") UUID actorId,
                      @Param("now") Instant now);
-}
+    int softDelete(@Param("templateIds") List<UUID> templateIds,
+                   @Param("reason") String reason, @Param("actorId") UUID actorId,
+                   @Param("now") Instant now);
+    int restore(@Param("templateIds") List<UUID> templateIds,
+                @Param("actorId") UUID actorId, @Param("now") Instant now);}

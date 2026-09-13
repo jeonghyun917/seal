@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 public class TemplateWebExceptionHandler {
     @ExceptionHandler(TemplateNotFoundException.class)
     public ResponseEntity<String> notFound() {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("동의서 템플릿을 찾을 수 없습니다.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("동의서 양식을 찾을 수 없습니다.");
     }
 
 }

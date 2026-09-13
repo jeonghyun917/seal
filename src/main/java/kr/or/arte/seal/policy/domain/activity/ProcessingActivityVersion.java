@@ -29,10 +29,10 @@ public record ProcessingActivityVersion(
         Objects.requireNonNull(createdBy, "createdBy");
         if (versionNumber < 1) throw new IllegalArgumentException("버전 번호는 1 이상이어야 합니다.");
         if (versionNo < 0) throw new IllegalArgumentException("낙관적 잠금 버전은 음수일 수 없습니다.");
-        processingPurpose = validateText(processingPurpose, 10, 1000, "처리 목적");
-        legalBasisDetail = validateText(legalBasisDetail, 5, 1000, "처리 근거 상세");
+        processingPurpose = validateText(processingPurpose, 10, 1000, "개인정보 이용 목적");
+        legalBasisDetail = validateText(legalBasisDetail, 5, 1000, "근거 상세 설명");
         dataItems = List.copyOf(Objects.requireNonNull(dataItems, "dataItems"));
-        if (dataItems.isEmpty()) throw new IllegalArgumentException("일반 개인정보 항목을 하나 이상 입력해야 합니다.");
+        if (dataItems.isEmpty()) throw new IllegalArgumentException("수집·이용할 개인정보 항목을 하나 이상 입력해야 합니다.");
     }
 
     public static ProcessingActivityVersion draft(UUID versionId, UUID activityId,

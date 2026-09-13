@@ -7,7 +7,6 @@ import kr.or.arte.seal.policy.domain.retention.RetentionStartEvent;
 import java.util.UUID;
 
 public record RetentionPolicyCreateCommand(
-        String policyCode,
         String policyName,
         UUID ownerOrganizationUnitId,
         RetentionStartEvent startEvent,

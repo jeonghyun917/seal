@@ -8,6 +8,8 @@ import java.util.UUID;
 
 public class RecipientForm {
     @NotNull private UUID organizationUnitId;
+    @Size(max = 200) private String affiliationName;
+    @Size(max = 100) private String jobTitle;
     @Size(max = 100) private String name;
     @Size(max = 254) private String email;
     @NotBlank @Size(min = 5, max = 500) private String collectionBasis;
@@ -15,6 +17,10 @@ public class RecipientForm {
 
     public UUID getOrganizationUnitId() { return organizationUnitId; }
     public void setOrganizationUnitId(UUID value) { organizationUnitId = value; }
+    public String getAffiliationName() { return affiliationName; }
+    public void setAffiliationName(String value) { affiliationName = value; }
+    public String getJobTitle() { return jobTitle; }
+    public void setJobTitle(String value) { jobTitle = value; }
     public String getName() { return name; }
     public void setName(String value) { name = value; }
     public String getEmail() { return email; }

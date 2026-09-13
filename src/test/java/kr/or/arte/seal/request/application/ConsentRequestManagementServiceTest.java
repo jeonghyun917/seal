@@ -31,6 +31,7 @@ class ConsentRequestManagementServiceTest {
     private static final UUID ACTOR = UUID.randomUUID();
     private static final UUID ORG = UUID.randomUUID();
     private static final UUID RECIPIENT = UUID.randomUUID();
+    private static final UUID SECOND_RECIPIENT = UUID.randomUUID();
     private static final UUID TEMPLATE = UUID.randomUUID();
     private static final UUID TEMPLATE_VERSION = UUID.randomUUID();
     private FakeRequestRepository requests;
@@ -63,6 +64,18 @@ class ConsentRequestManagementServiceTest {
         assertThat(second.requestId()).isEqualTo(first.requestId());
         assertThat(second.existing()).isTrue();
         assertThat(requests.insertCount).isEqualTo(1);
+    }
+
+    @Test
+    void createBatchCreatesIndependentDraftForEveryRecipient() {
+        var results = service.createBatch(ACTOR, new CreateConsentRequestBatchCommand(
+                List.of(RECIPIENT, SECOND_RECIPIENT), TEMPLATE_VERSION,
+                NOW.plusSeconds(7200), UUID.randomUUID()));
+
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(ConsentRequestCreateResult::requestId).doesNotHaveDuplicates();
+        assertThat(requests.rows.values()).extracting(ConsentRequestRecord::recipientId)
+                .containsExactlyInAnyOrder(RECIPIENT, SECOND_RECIPIENT);
     }
 
     @Test
@@ -147,15 +160,19 @@ class ConsentRequestManagementServiceTest {
     }
 
     private static final class StubRecipientRepository implements RecipientRepository {
-        private final RecipientStoredRecord row = new RecipientStoredRecord(RECIPIENT, ORG,
-                new byte[30], new byte[30], "v1", "a".repeat(64), "교육 참여 신청서 수집",
-                RecipientStatus.ACTIVE, 0);
+        private RecipientStoredRecord row(UUID recipientId) {
+            return new RecipientStoredRecord(recipientId, ORG,
+                    new byte[30], new byte[30], "v1", "a".repeat(64), "교육 참여 신청서 수집",
+                    RecipientStatus.ACTIVE, 0);
+        }
         @Override public boolean canAccessActiveOrganization(UUID a, UUID o) { return true; }
         @Override public Optional<RecipientStoredRecord> findActiveByEmailHmac(UUID o, String h, UUID e) { return Optional.empty(); }
         @Override public void insert(RecipientStoredRecord r, UUID a, Instant n) { }
-        @Override public Optional<RecipientStoredRecord> findScoped(UUID a, UUID id) { return RECIPIENT.equals(id) ? Optional.of(row) : Optional.empty(); }
+        @Override public Optional<RecipientStoredRecord> findScoped(UUID a, UUID id) {
+            return RECIPIENT.equals(id) || SECOND_RECIPIENT.equals(id) ? Optional.of(row(id)) : Optional.empty();
+        }
         @Override public boolean update(RecipientStoredRecord r, UUID a, Instant n, long v) { return false; }
-        @Override public List<RecipientStoredRecord> searchScoped(UUID a, String h, RecipientStatus s) { return List.of(row); }
+        @Override public List<RecipientStoredRecord> searchScoped(UUID a, String h, RecipientStatus s) { return List.of(row(RECIPIENT)); }
     }
 
     private static final class NoOpLinkRepository implements SecureLinkRepository {

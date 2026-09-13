@@ -139,7 +139,7 @@ class MailOutboxWorkerTest {
             var html = cipher.encrypt(new PersonalDataContext("MAIL_OUTBOX", id, org, "html"), "<p>hello</p>");
             row = new MailOutboxRecord(id, UUID.randomUUID(), UUID.randomUUID(), org,
                     email.bytes(), html.bytes(), email.keyId(), "subject", "a".repeat(64),
-                    MailOutboxStatus.QUEUED, now, now, attempt, null, 0);
+                    MailOutboxStatus.QUEUED, now, now, null, attempt, null, 0);
         }
 
         public List<MailOutboxRecord> claimDue(Instant ignored, int limit, Instant lease) {

@@ -1,15 +1,14 @@
 package kr.or.arte.seal.common.web;
 
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import java.security.Principal;
 
 @Controller
 public class HomeController {
 
     @GetMapping("/")
-    public String home(Model model) {
-        model.addAttribute("serviceName", "개인정보 전자동의·증적 관리시스템");
-        return "home";
+    public String home(Principal principal) {
+        return principal == null ? "redirect:/login" : "redirect:/admin";
     }
 }

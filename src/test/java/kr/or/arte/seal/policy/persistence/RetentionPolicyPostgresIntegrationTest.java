@@ -47,11 +47,12 @@ class RetentionPolicyPostgresIntegrationTest {
                 """, UUID.randomUUID(), reviewerId, organizationId, adminUserId);
 
         UUID policyId = managementService.create(new RetentionPolicyCreateCommand(
-                "IT-RP-01", "통합테스트 보유정책", organizationId,
+                "통합테스트 보유정책", organizationId,
                 RetentionStartEvent.CONSENT_SUBMITTED_AT, 3, RetentionPeriodUnit.YEAR,
                 30, DestructionMethod.DELETE, adminUserId));
 
-        assertThat(query.findVisiblePolicy(adminUserId, policyId).policyCode()).isEqualTo("IT-RP-01");
+        assertThat(query.findVisiblePolicy(adminUserId, policyId).policyCode())
+                .matches("RP-[A-F0-9]{16}");
         var versions = query.findVisibleVersions(adminUserId, policyId);
         assertThat(versions).hasSize(1);
         assertThat(versions.get(0).workflowStatus()).isEqualTo("DRAFT");

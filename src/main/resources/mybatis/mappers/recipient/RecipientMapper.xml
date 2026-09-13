@@ -20,6 +20,8 @@
         <constructor>
             <arg column="recipient_id" javaType="java.util.UUID"/>
             <arg column="organization_unit_id" javaType="java.util.UUID"/>
+            <arg column="affiliation_name" javaType="java.lang.String"/>
+            <arg column="job_title" javaType="java.lang.String"/>
             <arg column="recipient_name_ciphertext" javaType="_byte[]"/>
             <arg column="recipient_email_ciphertext" javaType="_byte[]"/>
             <arg column="encryption_key_id" javaType="java.lang.String"/>
@@ -31,7 +33,7 @@
     </resultMap>
 
     <sql id="recipientColumns">
-        recipient.recipient_id, recipient.organization_unit_id,
+        recipient.recipient_id, recipient.organization_unit_id, recipient.affiliation_name, recipient.job_title,
         recipient.recipient_name_ciphertext, recipient.recipient_email_ciphertext,
         recipient.encryption_key_id, recipient.email_lookup_hmac,
         recipient.collection_basis, recipient.recipient_status, recipient.version_no
@@ -59,11 +61,11 @@
     </select>
 
     <insert id="insert">
-        INSERT INTO seal.recipient (recipient_id, organization_unit_id,
+        INSERT INTO seal.recipient (recipient_id, organization_unit_id, affiliation_name, job_title,
             recipient_name_ciphertext, recipient_email_ciphertext, encryption_key_id,
             email_lookup_hmac, collection_source, collection_basis, recipient_status,
             created_by, created_at, updated_by, updated_at, version_no)
-        VALUES (#{record.recipientId}, #{record.organizationUnitId},
+        VALUES (#{record.recipientId}, #{record.organizationUnitId}, #{record.affiliationName,jdbcType=VARCHAR}, #{record.jobTitle,jdbcType=VARCHAR},
             #{record.nameCiphertext}, #{record.emailCiphertext}, #{record.encryptionKeyId},
             #{record.emailLookupHmac}, 'MANUAL', #{record.collectionBasis},
             #{record.status}, #{actorId}, #{now}, #{actorId}, #{now}, #{record.versionNo})
@@ -79,6 +81,8 @@
 
     <update id="update">
         UPDATE seal.recipient SET
+            affiliation_name = #{record.affiliationName,jdbcType=VARCHAR},
+            job_title = #{record.jobTitle,jdbcType=VARCHAR},
             recipient_name_ciphertext = #{record.nameCiphertext},
             recipient_email_ciphertext = #{record.emailCiphertext},
             encryption_key_id = #{record.encryptionKeyId},
@@ -95,6 +99,9 @@
         JOIN visible_scope scope ON scope.organization_unit_id = recipient.organization_unit_id
         <where>
             <if test="emailLookupHmac != null">recipient.email_lookup_hmac = #{emailLookupHmac}</if>
+            <if test="collectionBasis != null and collectionBasis != ''">
+                AND POSITION(LOWER(#{collectionBasis}) IN LOWER(recipient.collection_basis)) &gt; 0
+            </if>
             <if test="status != null">AND recipient.recipient_status = #{status}</if>
         </where>
         ORDER BY recipient.created_at DESC, recipient.recipient_id

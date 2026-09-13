@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.UUID;
 
 public record ProcessingActivityCreateCommand(
-        String activityCode,
         String activityName,
         UUID ownerOrganizationUnitId,
         String processingPurpose,

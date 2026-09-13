@@ -3,6 +3,7 @@ package kr.or.arte.seal.template.application;
 import kr.or.arte.seal.template.domain.ConsentTemplateVersion;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public interface ConsentTemplateRepository {
@@ -19,4 +20,6 @@ public interface ConsentTemplateRepository {
     int nextVersionNumber(UUID templateId);
     void insertVersion(ConsentTemplateVersion draft, UUID actorId, Instant now);
     void updateStatus(UUID templateId, String status, long versionNo, UUID actorId, Instant now);
+    int softDelete(List<UUID> templateIds, String reason, UUID actorId, Instant now);
+    int restore(List<UUID> templateIds, UUID actorId, Instant now);
 }

@@ -14,7 +14,7 @@ eGovFrame 5.0 기반 JSP 모듈형 모놀리스 프로젝트다. HTML 이메일�
 | DB | PostgreSQL 16.14 |
 | Build | Maven Wrapper 3.3.4 / Maven 3.9.11 |
 | Deploy | 단일 WAR, Tomcat 10.1 |
-| Mail | 기본 `relay.govkorea.com:25`, SSL·STARTTLS·인증 없음 / 대안 `465`, implicit SSL·무인증 |
+| Mail | 기본 `relay.govkorea.com:465`, implicit TLS·서버 인증서 검증·무인증 (STARTTLS 미사용) |
 
 공식 eGovFrame 5.0 실행환경은 Java 17 이상을 지원한다. 프로젝트에는 공식 Maven 저장소에 실제 게시된 5.0.0 런타임 모듈을 사용한다.
 
@@ -99,12 +99,12 @@ $env:SEAL_ADMIN_LOCK_DURATION = '15m'
 ```powershell
 $env:SEAL_MAIL_ENABLED = 'true'
 $env:SEAL_SMTP_HOST = 'relay.govkorea.com'
-$env:SEAL_SMTP_PORT = '25'
-$env:SEAL_SMTP_SSL_ENABLED = 'false'
+$env:SEAL_SMTP_PORT = '465'
+$env:SEAL_SMTP_SSL_ENABLED = 'true'
 $env:SEAL_MAIL_FROM_ADDRESS = 'seal@arte.or.kr'
 ```
 
-25번 포트는 기관 허용망 안에서 SSL·STARTTLS·SMTP 인증 없이 사용한다. 인터넷 구간에서 평문 SMTP를 임의로 사용하지 않는다. 465번 포트를 사용할 때는 `SEAL_SMTP_PORT=465`, `SEAL_SMTP_SSL_ENABLED=true`를 함께 설정한다.
+메일은 465번 포트의 implicit TLS로 연결하며 서버 인증서를 검증한다. `SEAL_SMTP_PORT=465`, `SEAL_SMTP_SSL_ENABLED=true`를 함께 사용하고, STARTTLS와 SMTP 인증은 사용하지 않는다. 기존 실행 환경에 25번 포트 또는 SSL 비활성 환경변수가 남아 있으면 위 값으로 변경한 뒤 재시작한다. 포트 변경만으로 자동 발송을 활성화하지는 않는다.
 
 ## 패키징
 
@@ -113,6 +113,20 @@ $env:SEAL_MAIL_FROM_ADDRESS = 'seal@arte.or.kr'
 ```
 
 산출물은 `target/seal.war`이다. 운영 배포는 [ops/rocky/README.md](ops/rocky/README.md)를 따른다.
+
+### JSP 사전 컴파일
+
+`test`·`package` 실행 시 `process-classes` 단계에서 모든 JSP와 공통 태그를 Jasper로 사전 컴파일한다. JSP 오류도 빌드 실패로 확인할 수 있다. 생성한 클래스와 내부 경로 매핑(`META-INF/jspc-web.xml`)은 WAR에 포함되며, 서버는 이 클래스로 화면을 렌더링한다. 시작 로그의 `Registered … build-time compiled JSP servlets`로 연결 여부를 확인한다.
+
+JSP 수정 후에는 반드시 다시 `package`하고 WAR 전체를 배포한다. 배포된 JSP 원본만 덮어쓰면 컴파일된 화면에 반영되지 않는다. 생성 파일은 `target/jspc`와 `target/classes/org/apache/jsp`에 있으며 매 빌드 단계에서 다시 생성한다. `compile` 명령만으로는 이 단계가 실행되지 않는다. 생성 매핑이 없는 소스 직접 실행 환경에서는 기존 런타임 JSP 컴파일을 사용한다.
+
+사전 컴파일은 첫 접속의 JSP 번역·컴파일 작업을 빌드로 옮기는 것으로, DB 조회·로그인 비밀번호 검증·클래스 초기화까지 없애지는 않는다. 빌드의 Jasper와 배포 Tomcat은 호환되는 10.1 버전을 유지한다.
+
+### 로그인 화면 워밍업
+
+내장 HTTP 서버는 시작 시 `/login`에 익명 GET을 한 번 보내 화면 엔진을 초기화한 뒤 Spring Boot의 준비 완료 상태로 전환한다. 로그인 POST, 관리자 메뉴 조회, 메일 발송은 수행하지 않으며 응답 쿠키를 보관하거나 사용자에게 재사용하지 않는다. 실패하면 준비 완료로 처리하지 않고 시작을 실패시킨다. 연결 제한은 2초, 요청 제한은 10초다.
+
+`--seal.login-warmup.enabled=false`로 끌 수 있다. 외부 Tomcat은 배포 절차에서 로그인 GET과 정상 응답을 확인해야 한다. 내장 HTTPS도 이 설정을 끄고 신뢰된 인증서로 배포 시 워밍업을 수행한다(인증서 검증을 우회하지 않는다). 트래픽을 시작 전에 확실히 차단하려면 앞단에서 readiness 상태를 기준으로 유입을 제어해야 한다. 직접 포트 접속은 서버 초기화 중에도 가능하다.
 
 ## 보안 주의
 

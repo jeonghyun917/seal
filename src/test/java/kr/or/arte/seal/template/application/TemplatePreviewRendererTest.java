@@ -29,7 +29,7 @@ class TemplatePreviewRendererTest {
                 "교육 프로그램 운영", "ACTIVE", null, 0, version);
         ApprovedProcessingActivityReference policy = new ApprovedProcessingActivityReference(
                 version.processingActivityId(), version.processingActivityVersionId(), UUID.randomUUID(),
-                "교육 프로그램 운영", "교육 프로그램 참여자 등록 및 운영 목적", "CONSENT",
+                "PA-EDU", "교육 프로그램 운영", "교육 프로그램 참여자 등록 및 운영 목적", "CONSENT",
                 UUID.randomUUID(), "동의 제출 후 3년",
                 List.of(new ApprovedDataItemReference(firstData, 1, "성명", true),
                         new ApprovedDataItemReference(secondData, 2, "이메일", true)));

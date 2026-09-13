@@ -7,6 +7,7 @@ import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.config.SecurityConfig;
 import kr.or.arte.seal.common.web.HomeController;
+import kr.or.arte.seal.statistics.application.StatisticsQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.Clock;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -52,6 +55,12 @@ class AdminSecurityMvcTest {
 
     @MockitoBean
     private DatabaseAuthenticationProvider databaseAuthenticationProvider;
+
+    @MockitoBean
+    private StatisticsQueryService statisticsQueryService;
+
+    @MockitoBean
+    private Clock clock;
 
     @BeforeEach
     void configureDatabaseAuthenticationProvider() {
@@ -89,6 +98,23 @@ class AdminSecurityMvcTest {
     }
 
     @Test
+    void staleLoginCsrfRedirectsToFreshLoginPage() throws Exception {
+        mockMvc.perform(post("/login")
+                        .param("username", "seal-admin")
+                        .param("password", "password-from-stale-page"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?expired"));
+    }
+
+    @Test
+    void expiredLoginPageExplainsThatTheUserShouldTryAgain() throws Exception {
+        mockMvc.perform(get("/login").param("expired", ""))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("errorMessage",
+                        "로그인 페이지의 유효시간이 지났습니다. 새로 열린 화면에서 다시 로그인해 주세요."));
+    }
+
+    @Test
     void csrfLessPasswordChangeIsRejected() throws Exception {
         mockMvc.perform(post("/account/password/change")
                         .with(user("admin").roles("SYSTEM_ADMIN"))
@@ -120,10 +146,10 @@ class AdminSecurityMvcTest {
     }
 
     @Test
-    void forcedChangeAccountCanStillReadPublicHome() throws Exception {
+    void forcedChangeAccountUsesProtectedAdminRedirectFromHome() throws Exception {
         mockMvc.perform(get("/").with(authentication(adminAuthentication(true))))
-                .andExpect(status().isOk())
-                .andExpect(view().name("home"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin"));
     }
 
     @Test

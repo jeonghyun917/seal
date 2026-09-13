@@ -74,6 +74,7 @@
             ON scope.organization_unit_id = activity.owner_organization_unit_id
          WHERE template.consent_template_id = #{templateId}
            AND version.consent_template_version_id = #{versionId}
+           AND template.deleted_at IS NULL
          FOR UPDATE OF template, version
     </select>
 
@@ -97,6 +98,7 @@
             ON scope.organization_unit_id = activity.owner_organization_unit_id
          WHERE template.consent_template_id = #{templateId}
            AND version.consent_template_version_id = #{versionId}
+           AND template.deleted_at IS NULL
     </select>
 
     <select id="findItems" resultType="kr.or.arte.seal.template.persistence.ConsentItemRow">
@@ -223,10 +225,41 @@
         <include refid="visibleScope"/>
         UPDATE seal.consent_template
            SET template_status = #{status}, updated_by = #{actorId}, updated_at = #{now},
-               version_no = version_no + 1
+               version_no = consent_template.version_no + 1
           FROM seal.processing_activity activity, visible_scope scope
          WHERE consent_template.consent_template_id = #{templateId}
            AND consent_template.version_no = #{versionNo}
+           AND consent_template.deleted_at IS NULL
+           AND activity.processing_activity_id = consent_template.processing_activity_id
+           AND scope.organization_unit_id = activity.owner_organization_unit_id
+    </update>
+
+    <update id="softDelete">
+        <include refid="visibleScope"/>
+        UPDATE seal.consent_template
+           SET deleted_at = #{now}, deleted_by = #{actorId}, delete_reason = #{reason},
+               updated_by = #{actorId}, updated_at = #{now}, version_no = consent_template.version_no + 1
+          FROM seal.processing_activity activity, visible_scope scope
+         WHERE consent_template.consent_template_id IN
+        <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+           AND consent_template.deleted_at IS NULL
+           AND activity.processing_activity_id = consent_template.processing_activity_id
+           AND scope.organization_unit_id = activity.owner_organization_unit_id
+    </update>
+
+    <update id="restore">
+        <include refid="visibleScope"/>
+        UPDATE seal.consent_template
+           SET deleted_at = NULL, deleted_by = NULL, delete_reason = NULL,
+               updated_by = #{actorId}, updated_at = #{now}, version_no = consent_template.version_no + 1
+          FROM seal.processing_activity activity, visible_scope scope
+         WHERE consent_template.consent_template_id IN
+        <foreach collection="templateIds" item="templateId" open="(" separator="," close=")">
+            #{templateId}
+        </foreach>
+           AND consent_template.deleted_at IS NOT NULL
            AND activity.processing_activity_id = consent_template.processing_activity_id
            AND scope.organization_unit_id = activity.owner_organization_unit_id
     </update>

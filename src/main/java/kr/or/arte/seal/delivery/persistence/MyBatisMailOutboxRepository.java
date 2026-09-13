@@ -37,7 +37,7 @@ public class MyBatisMailOutboxRepository implements MailOutboxRepository {
     }
 
     public List<MailOutboxRecord> search(UUID actorId, MailOutboxStatus status) {
-        return mapper.search(actorId, status, 100, 0);
+        return mapper.search(actorId, status, null, 100, 0);
     }
     public Optional<MailOutboxRecord> findScoped(UUID actorId, UUID id) { return mapper.findScoped(actorId, id); }
     public void requeue(UUID actorId, UUID id, Instant now) {
@@ -47,5 +47,7 @@ public class MyBatisMailOutboxRepository implements MailOutboxRepository {
     private static void requireUpdated(int affected) {
         if (affected != 1) throw new IllegalStateException("메일 처리 상태가 이미 변경되었습니다.");
     }
-    public List<MailOutboxRecord> search(UUID actor,MailOutboxStatus status,int limit,int offset){return mapper.search(actor,status,limit,offset);}
+    public List<MailOutboxRecord> search(UUID actor,MailOutboxStatus status,int limit,int offset){return mapper.search(actor,status,null,limit,offset);}
+    @Override public List<MailOutboxRecord> search(UUID actor, MailOutboxStatus status, String query,
+            int limit, int offset) { return mapper.search(actor, status, query, limit, offset); }
 }

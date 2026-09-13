@@ -20,10 +20,24 @@ public class ConsentRequestQueryService {
     }
 
     @Transactional(readOnly = true)
+    public List<ConsentRequestSummary> searchByRecipient(UUID actorId, UUID recipientId) {
+        return repository.searchScopedByRecipient(actorId, recipientId).stream().map(row -> new ConsentRequestSummary(
+                row.requestId(), row.requestCode(), row.recipientId(), row.status(), row.expiresAt(),
+                row.createdAt(), row.versionNo())).toList();
+    }
+
+    @Transactional(readOnly = true)
     public kr.or.arte.seal.common.web.AdminPageResult<ConsentRequestSummary> searchPage(UUID actorId,
             ConsentRequestStatus status,int page,int size){
+        return searchPage(actorId, status, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public kr.or.arte.seal.common.web.AdminPageResult<ConsentRequestSummary> searchPage(UUID actorId,
+            ConsentRequestStatus status, String query, int page, int size){
         int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
-        var rows=repository.searchScoped(actorId,status,safeSize+1,offset).stream().map(row -> new ConsentRequestSummary(
+        String normalized = query == null || query.isBlank() ? null : query.strip();
+        var rows=repository.searchScoped(actorId,status,normalized,safeSize+1,offset).stream().map(row -> new ConsentRequestSummary(
                 row.requestId(),row.requestCode(),row.recipientId(),row.status(),row.expiresAt(),row.createdAt(),row.versionNo())).toList();
         return kr.or.arte.seal.common.web.AdminPageResult.of(rows,safePage,safeSize);
     }

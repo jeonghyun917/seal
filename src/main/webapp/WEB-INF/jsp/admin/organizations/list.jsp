@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>조직 관리 | 개인정보 전자동의·증적 관리시스템</title>
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css">
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css?v=20260906-3">
 </head>
 <body class="admin-body"><jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
 

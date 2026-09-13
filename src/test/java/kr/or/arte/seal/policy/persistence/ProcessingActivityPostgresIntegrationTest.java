@@ -33,9 +33,7 @@ class ProcessingActivityPostgresIntegrationTest {
                 "SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit = TRUE", UUID.class);
         UUID reviewerId = createReviewer(authorId, organizationId);
         UUID retentionVersionId = createApprovedRetentionPolicy(authorId, reviewerId, organizationId);
-        String code = "IT-PA-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-
-        UUID activityId = management.create(new ProcessingActivityCreateCommand(code,
+        UUID activityId = management.create(new ProcessingActivityCreateCommand(
                 "통합테스트 처리업무", organizationId,
                 "통합테스트 개인정보 처리업무의 참여자를 등록하고 운영하기 위한 목적입니다.",
                 LegalBasisType.CONSENT, "정보주체의 개인정보 수집·이용 동의",
@@ -63,7 +61,8 @@ class ProcessingActivityPostgresIntegrationTest {
                 SELECT workflow_status = 'APPROVED' FROM seal.processing_activity_version
                  WHERE processing_activity_version_id = ?
                 """, Boolean.class, versionId)).isTrue();
-        assertThat(query.findVisibleActivity(authorId, activityId).activityCode()).isEqualTo(code);
+        assertThat(query.findVisibleActivity(authorId, activityId).activityCode())
+                .matches("PA-[A-F0-9]{16}");
         assertThat(query.findVisibleVersions(authorId, activityId)).singleElement()
                 .satisfies(version -> assertThat(version.workflowStatus().name()).isEqualTo("APPROVED"));
         assertThat(query.findVisibleDataItems(authorId, activityId)).hasSize(2);

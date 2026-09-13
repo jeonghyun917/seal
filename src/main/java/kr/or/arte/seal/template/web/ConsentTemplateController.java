@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.http.HttpStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import kr.or.arte.seal.template.application.TemplateBusinessConflictException;
@@ -30,6 +31,9 @@ import kr.or.arte.seal.template.application.TemplateBusinessConflictException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import kr.or.arte.seal.common.web.AdminPageResult;
+import kr.or.arte.seal.policy.application.activity.ApprovedDataItemReference;
+import kr.or.arte.seal.policy.application.activity.ApprovedProcessingActivityReference;
 
 @Controller
 public class ConsentTemplateController {
@@ -60,14 +64,57 @@ public class ConsentTemplateController {
         return "admin/templates/list";
     }
 
+    @GetMapping("/admin/templates/deleted")
+    @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_VIEW')")
+    public String deletedList(@RequestParam(required = false) String keyword,
+            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+        model.addAttribute("administrator", principal);
+        model.addAttribute("deletedTemplates", query.searchDeleted(principal.adminUserId(), keyword));
+        model.addAttribute("keyword", keyword);
+        return "admin/templates/deleted-list";
+    }
+
+    @PostMapping("/admin/templates/delete")
+    @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_EDIT')")
+    public String deleteTemplates(@RequestParam(required = false) List<UUID> templateIds,
+            @RequestParam(required = false) String deleteReason,
+            @AuthenticationPrincipal AdminPrincipal principal) {
+        management.deleteTemplates(templateIds, deleteReason, principal.adminUserId());
+        return "redirect:/admin/templates?deleted";
+    }
+
+    @PostMapping("/admin/templates/restore")
+    @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_EDIT')")
+    public String restoreTemplates(@RequestParam(required = false) List<UUID> templateIds,
+            @AuthenticationPrincipal AdminPrincipal principal) {
+        management.restoreTemplates(templateIds, principal.adminUserId());
+        return "redirect:/admin/templates/deleted?restored";
+    }
     @GetMapping("/admin/templates/new")
     @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_EDIT')")
     public String createForm(@AuthenticationPrincipal AdminPrincipal principal, Model model) {
         ConsentTemplateForm form = new ConsentTemplateForm();
         form.getItems().add(new ConsentItemForm());
         model.addAttribute("templateForm", form);
-        populateForm(principal, model, false, null, null);
+        populateForm(principal, model, false, null, null, null);
         return "admin/templates/form";
+    }
+
+    @GetMapping("/admin/templates/activity-options")
+    @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_EDIT')")
+    @ResponseBody
+    public ActivityOptionsResponse activityOptions(@RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "1") int page,
+            @AuthenticationPrincipal AdminPrincipal principal) {
+        int safePage = Math.max(1, page);
+        int size = 20;
+        List<ApprovedProcessingActivityReference> fetched =
+                approvedActivityQuery.searchApprovedForTemplate(principal.adminUserId(), keyword,
+                        size + 1, (safePage - 1) * size);
+        AdminPageResult<ApprovedProcessingActivityReference> result =
+                AdminPageResult.of(fetched, safePage, size);
+        return new ActivityOptionsResponse(result.items().stream().map(ActivityOption::from).toList(),
+                result.page(), result.hasNext());
     }
 
     @PostMapping("/admin/templates")
@@ -75,10 +122,11 @@ public class ConsentTemplateController {
     public String create(@Valid @ModelAttribute("templateForm") ConsentTemplateForm form,
             BindingResult result, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         if (result.hasErrors()) {
-            populateForm(principal, model, false, null, null);
+            populateForm(principal, model, false, null, null,
+                    form.getProcessingActivityVersionId());
             return "admin/templates/form";
         }
-        UUID templateId = management.create(new CreateConsentTemplateCommand(form.getTemplateCode(),
+        UUID templateId = management.create(new CreateConsentTemplateCommand(
                 form.getTemplateName(), form.getProcessingActivityVersionId(), form.getTitle(),
                 form.getIntroductionHtml(), commands(form), principal.adminUserId()));
         return "redirect:/admin/templates/" + templateId + "?created";
@@ -100,7 +148,8 @@ public class ConsentTemplateController {
         ConsentTemplateDetail detail = query.requireVersionScoped(templateId, versionId,
                 principal.adminUserId());
         model.addAttribute("templateForm", toForm(detail));
-        populateForm(principal, model, true, templateId, versionId);
+        populateForm(principal, model, true, templateId, versionId,
+                detail.version().processingActivityVersionId());
         return "admin/templates/form";
     }
 
@@ -110,13 +159,28 @@ public class ConsentTemplateController {
             @Valid @ModelAttribute("templateForm") ConsentTemplateForm form, BindingResult result,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         if (result.hasErrors()) {
-            populateForm(principal, model, true, templateId, versionId);
+            populateForm(principal, model, true, templateId, versionId,
+                    form.getProcessingActivityVersionId());
             return "admin/templates/form";
         }
         management.updateDraft(new UpdateConsentTemplateDraftCommand(templateId, versionId,
                 form.getTemplateName(), form.getTitle(), form.getIntroductionHtml(), commands(form),
                 form.getTemplateVersionNo(), form.getContentVersionNo(), principal.adminUserId()));
         return redirect(templateId, "updated");
+    }
+
+    @GetMapping("/admin/templates/{templateId}/versions/{versionId}")
+    @PreAuthorize("hasAuthority('CONSENT_TEMPLATE_VIEW')")
+    public String versionDetail(@PathVariable UUID templateId, @PathVariable UUID versionId,
+            @AuthenticationPrincipal AdminPrincipal principal, Model model) {
+        ConsentTemplateDetail detail = query.requireVersionScoped(templateId, versionId,
+                principal.adminUserId());
+        var policy = approvedActivityQuery.findReferenceForExistingTemplate(
+                principal.adminUserId(), detail.version().processingActivityVersionId());
+        model.addAttribute("administrator", principal);
+        model.addAttribute("detail", detail);
+        model.addAttribute("preview", previewRenderer.toView(detail, policy));
+        return "admin/templates/version-detail";
     }
 
     @GetMapping("/admin/templates/{templateId}/versions/{versionId}/preview")
@@ -197,10 +261,19 @@ public class ConsentTemplateController {
     }
 
     private void populateForm(AdminPrincipal principal, Model model, boolean editing,
-                              UUID templateId, UUID versionId) {
+                              UUID templateId, UUID versionId, UUID selectedActivityVersionId) {
         model.addAttribute("administrator", principal);
-        model.addAttribute("activities", approvedActivityQuery.findAllApprovedForTemplate(
-                principal.adminUserId()));
+        if (selectedActivityVersionId != null) {
+            try {
+                model.addAttribute("selectedActivity", editing
+                        ? approvedActivityQuery.findReferenceForExistingTemplate(
+                                principal.adminUserId(), selectedActivityVersionId)
+                        : approvedActivityQuery.findApprovedForTemplate(
+                                principal.adminUserId(), selectedActivityVersionId));
+            } catch (IllegalArgumentException ignored) {
+                model.addAttribute("selectedActivity", null);
+            }
+        }
         model.addAttribute("itemTypes", ConsentItemType.values());
         model.addAttribute("editing", editing);
         model.addAttribute("templateId", templateId);
@@ -208,7 +281,7 @@ public class ConsentTemplateController {
     }
 
     private static List<ConsentItemDraftCommand> commands(ConsentTemplateForm form) {
-        return form.getItems().stream().map(item -> new ConsentItemDraftCommand(item.getCode(),
+        return form.getItems().stream().map(item -> new ConsentItemDraftCommand(
                 item.getType(), item.getTitle(), item.isRequired(), item.getPurpose(),
                 item.getRetentionText(), item.getRefusalNotice(), item.getThirdPartyRecipient(),
                 item.getProcessingDataItemIds())).toList();
@@ -216,7 +289,6 @@ public class ConsentTemplateController {
 
     private ConsentTemplateForm toForm(ConsentTemplateDetail detail) {
         ConsentTemplateForm form = new ConsentTemplateForm();
-        form.setTemplateCode(detail.templateCode());
         form.setTemplateName(detail.templateName());
         form.setProcessingActivityVersionId(detail.version().processingActivityVersionId());
         form.setTitle(detail.version().title());
@@ -224,7 +296,7 @@ public class ConsentTemplateController {
         List<ConsentItemForm> items = new ArrayList<>();
         detail.version().items().forEach(item -> {
             ConsentItemForm entry = new ConsentItemForm();
-            entry.setCode(item.code()); entry.setType(item.type()); entry.setTitle(item.title());
+            entry.setType(item.type()); entry.setTitle(item.title());
             entry.setRequired(item.required()); entry.setPurpose(item.purpose());
             entry.setRetentionText(item.retentionText()); entry.setRefusalNotice(item.refusalNotice());
             entry.setThirdPartyRecipient(item.thirdPartyRecipient());
@@ -238,6 +310,18 @@ public class ConsentTemplateController {
 
     private static String redirect(UUID templateId, String event) {
         return "redirect:/admin/templates/" + templateId + "?" + event;
+    }
+
+    public record ActivityOptionsResponse(List<ActivityOption> items, int page, boolean hasNext) { }
+
+    public record ActivityOption(UUID activityId, UUID versionId, String activityCode,
+            String activityName, String processingPurpose, String retentionDisplayText,
+            List<ApprovedDataItemReference> dataItems) {
+        static ActivityOption from(ApprovedProcessingActivityReference activity) {
+            return new ActivityOption(activity.activityId(), activity.versionId(),
+                    activity.activityCode(), activity.activityName(), activity.processingPurpose(),
+                    activity.retentionDisplayText(), activity.dataItems());
+        }
     }
 
     private static UUID templateIdFrom(String uri) {

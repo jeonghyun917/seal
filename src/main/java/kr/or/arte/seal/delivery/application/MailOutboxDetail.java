@@ -10,6 +10,7 @@ public record MailOutboxDetail(
         String subject,
         Instant scheduledAt,
         Instant nextAttemptAt,
+        Instant smtpAcceptedAt,
         int attemptCount,
         String html) {
 }

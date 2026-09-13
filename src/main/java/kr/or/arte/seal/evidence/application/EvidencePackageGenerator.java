@@ -22,7 +22,7 @@ public class EvidencePackageGenerator implements EvidenceArtifactGenerator {
         if(keyFile==null||keyFile.isBlank())throw new IllegalStateException("증적 HMAC 키가 설정되지 않았습니다.");
         try{
             Map<String,byte[]> content=new LinkedHashMap<>();
-            content.put("evidence.pdf",pdf.render(item.requestId(),item.title(),item.decisions()));
+            content.put("evidence.pdf",pdf.render(item));
             content.put("request.json",item.snapshotJson().getBytes(StandardCharsets.UTF_8));
             content.put("decisions.json",json.writeValueAsBytes(item.decisions()));
             content.put("events.json",json.writeValueAsBytes(item.events()));

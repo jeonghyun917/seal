@@ -123,8 +123,36 @@
         <include refid="visibleScope"/> SELECT <include refid="columns"/>
         FROM seal.consent_request request JOIN visible_scope scope
           ON scope.organization_unit_id = request.organization_unit_id
-        <where><if test="status != null">request.request_status = #{status}</if></where>
+        JOIN seal.consent_template_version template_version
+          ON template_version.consent_template_version_id = request.consent_template_version_id
+        JOIN seal.consent_template template
+          ON template.consent_template_id = template_version.consent_template_id
+        <where>
+          <if test="status != null">request.request_status = #{status}</if>
+          <if test="query != null and query != ''">
+            AND (request.request_code ILIKE '%' || #{query} || '%'
+              OR template_version.title ILIKE '%' || #{query} || '%'
+              OR template.template_name ILIKE '%' || #{query} || '%')
+          </if>
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id = #{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id = #{actorId}
+                            AND allowed.processing_activity_id = request.processing_activity_id))
+        </where>
         ORDER BY request.created_at DESC, request.consent_request_id LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="searchScopedByRecipient" resultMap="requestRecord">
+        <include refid="visibleScope"/> SELECT <include refid="columns"/>
+        FROM seal.consent_request request JOIN visible_scope scope
+          ON scope.organization_unit_id = request.organization_unit_id
+        WHERE request.recipient_id = #{recipientId}
+          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+                           WHERE configured.admin_user_id = #{actorId})
+               OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
+                          WHERE allowed.admin_user_id = #{actorId}
+                            AND allowed.processing_activity_id = request.processing_activity_id))
+        ORDER BY request.created_at DESC, request.consent_request_id
     </select>
     <select id="findDueForUpdate" resultMap="requestRecord">
         SELECT <include refid="columns"/> FROM seal.consent_request request

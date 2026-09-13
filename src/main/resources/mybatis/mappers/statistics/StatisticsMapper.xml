@@ -24,7 +24,7 @@
              WHERE res.submitted_at&gt;=#{from} AND res.submitted_at&lt;(#{to}::date+1)
              GROUP BY res.response_status
             UNION ALL
-            SELECT 'RESPONSE', 'WITHDRAWN', count(*)
+            SELECT 'RESPONSE_WARNING', 'WITHDRAWN', count(*)
               FROM seal.consent_withdrawal w
               JOIN seal.consent_response res USING(consent_response_id)
               JOIN seal.consent_request r USING(consent_request_id)
@@ -43,7 +43,7 @@
              WHERE e.queued_at&gt;=#{from} AND e.queued_at&lt;(#{to}::date+1)
              GROUP BY e.generation_status
             UNION ALL
-            SELECT 'EVIDENCE', 'VERIFY_' || v.verification_result, count(*)
+            SELECT 'EVIDENCE_WARNING', 'VERIFY_' || v.verification_result, count(*)
               FROM seal.evidence_verification v
               JOIN seal.evidence_package e USING(evidence_package_id)
               JOIN visible_scope s USING(organization_unit_id)
@@ -56,7 +56,7 @@
              WHERE rr.created_at&gt;=#{from} AND rr.created_at&lt;(#{to}::date+1)
              GROUP BY rr.rights_type, rr.request_status
             UNION ALL
-            SELECT 'RIGHTS', 'OVERDUE', count(*)
+            SELECT 'RIGHTS_WARNING', 'OVERDUE', count(*)
               FROM seal.rights_request rr JOIN visible_scope s USING(organization_unit_id)
              WHERE rr.due_date&lt;CURRENT_DATE
                AND rr.request_status NOT IN ('COMPLETED','CANCELLED')
@@ -69,7 +69,7 @@
              WHERE j.requested_at&gt;=#{from} AND j.requested_at&lt;(#{to}::date+1)
              GROUP BY j.job_status
             UNION ALL
-            SELECT 'RETENTION', 'LEGAL_HOLD_ACTIVE', count(*)
+            SELECT 'RETENTION_WARNING', 'LEGAL_HOLD_ACTIVE', count(*)
               FROM seal.legal_hold h
               JOIN seal.consent_request r USING(consent_request_id)
               JOIN visible_scope s USING(organization_unit_id)

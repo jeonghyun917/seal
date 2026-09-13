@@ -1,7 +1,7 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>역할·권한 | 개인정보 전자동의·증적 관리시스템</title><link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css"><link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css"></head>
+<title>역할·권한 | 개인정보 전자동의·증적 관리시스템</title><link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/app.css"><link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css?v=20260906-3"></head>
 <body class="admin-body"><jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
 
 <div class="admin-layout"><jsp:include page="/WEB-INF/jsp/fragments/admin/sidebar.jsp"/><main class="admin-main"><div class="page-heading-row"><div><p class="section-kicker">ROLES &amp; PERMISSIONS</p><h1>역할·권한</h1><p>시스템 역할별 사용자 수와 부여된 작업 권한을 조회합니다.</p></div><a class="primary-button" href="${pageContext.request.contextPath}/admin/roles/new">역할 등록</a></div>

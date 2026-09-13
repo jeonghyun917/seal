@@ -35,12 +35,56 @@ class ConsentRequestPostgresIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired RecipientManagementService recipients;
     @Autowired ConsentRequestManagementService requests;
+    @Autowired kr.or.arte.seal.request.application.ConsentRequestQueryService requestQuery;
+    @Autowired kr.or.arte.seal.retention.application.RetentionJobService retentionJobs;
     @Autowired ConsentDeliveryService delivery;
     @Autowired MailOutboxQueryService mailOutbox;
     @Autowired PublicConsentEntryService publicEntry;
     @Autowired PublicConsentQueryService publicQuery;
     @Autowired ConsentSubmissionService submissions;
     @Autowired PublicConsentSessionExpiryService sessionExpiry;
+
+    @Test
+    void listQueriesExcludeOtherActivitiesBeforePagination() {
+        UUID system=id("SELECT admin_user_id FROM seal.admin_user WHERE login_id='seal-admin'");
+        UUID org=id("SELECT organization_unit_id FROM seal.organization_unit WHERE root_unit=TRUE");
+        UUID creator=fixtureCreator();
+        Fixture allowed=publishedFixture(org,creator,system), denied=publishedFixture(org,creator,system);
+        UUID actor=UUID.randomUUID();
+        jdbc.update("INSERT INTO seal.admin_user(admin_user_id,login_id,display_name,organization_unit_id,password_hash,must_change_password,created_by) SELECT ?,?,?,?,password_hash,FALSE,? FROM seal.admin_user WHERE admin_user_id=?",
+                actor,"activity-limited-"+actor.toString().substring(0,8),"처리업무 제한 관리자",org,system,system);
+        jdbc.update("INSERT INTO seal.user_scope(user_scope_id,admin_user_id,scope_type,scope_target_id,include_descendants,assigned_by) VALUES(?,?,'ORGANIZATION',?,FALSE,?)",
+                UUID.randomUUID(),actor,org,system);
+        jdbc.update("INSERT INTO seal.user_processing_activity_scope(admin_user_id,processing_activity_id,assigned_by) VALUES(?,?,?)",
+                actor,allowed.activityId(),system);
+        UUID recipient=recipients.create(new CreateRecipientCommand(system,org,"목록 범위 대상자",
+                "scope-"+UUID.randomUUID()+"@example.com","처리업무 범위 테스트"));
+        var visible=requests.create(system,new CreateConsentRequestCommand(org,recipient,allowed.templateVersionId(),Instant.now().plusSeconds(7200),UUID.randomUUID()));
+        var hidden=requests.create(system,new CreateConsentRequestCommand(org,recipient,denied.templateVersionId(),Instant.now().plusSeconds(7200),UUID.randomUUID()));
+        requests.finalizeRequest(system,visible.requestId(),0); requests.finalizeRequest(system,hidden.requestId(),0);
+        delivery.activateAndQueue(system,visible.requestId(),1,"http://localhost:9090",null);
+        delivery.activateAndQueue(system,hidden.requestId(),1,"http://localhost:9090",null);
+        UUID visibleJob=UUID.randomUUID(), hiddenJob=UUID.randomUUID();
+        jdbc.update("INSERT INTO seal.retention_job(retention_job_id,consent_request_id,recipient_id,retention_policy_version_id,anchor_date,due_date,job_status,destruction_method,requested_at) VALUES(?,?,?,?,CURRENT_DATE,CURRENT_DATE,'DUE','DELETE',CURRENT_TIMESTAMP)",
+                visibleJob,visible.requestId(),recipient,allowed.retentionVersionId());
+        jdbc.update("INSERT INTO seal.retention_job(retention_job_id,consent_request_id,recipient_id,retention_policy_version_id,anchor_date,due_date,job_status,destruction_method,requested_at) VALUES(?,?,?,?,CURRENT_DATE,CURRENT_DATE,'DUE','DELETE',CURRENT_TIMESTAMP)",
+                hiddenJob,hidden.requestId(),recipient,denied.retentionVersionId());
+        jdbc.update("INSERT INTO seal.legal_hold(legal_hold_id,consent_request_id,hold_reason_code,reason_text,active,held_by,held_at) VALUES(?,?,?,? ,TRUE,?,CURRENT_TIMESTAMP)",
+                UUID.randomUUID(),visible.requestId(),"VISIBLE_HOLD","허용 처리업무",system);
+        jdbc.update("INSERT INTO seal.legal_hold(legal_hold_id,consent_request_id,hold_reason_code,reason_text,active,held_by,held_at) VALUES(?,?,?,? ,TRUE,?,CURRENT_TIMESTAMP)",
+                UUID.randomUUID(),hidden.requestId(),"HIDDEN_HOLD","비허용 처리업무",system);
+
+        assertThat(requestQuery.searchPage(actor,null,null,1,20).items()).extracting(item->item.requestId())
+                .contains(visible.requestId()).doesNotContain(hidden.requestId());
+        assertThat(mailOutbox.searchPage(actor,null,null,1,20).items()).extracting(item->item.requestId())
+                .contains(visible.requestId()).doesNotContain(hidden.requestId());
+        assertThat(retentionJobs.searchPage(actor,null,1,20).items()).extracting(item->item.id())
+                .contains(visibleJob).doesNotContain(hiddenJob);
+        assertThat(retentionJobs.activeLegalHolds(actor)).extracting(item->item.consentRequestId())
+                .contains(visible.requestId()).doesNotContain(hidden.requestId());
+        assertThat(retentionJobs.require(actor,visibleJob).id()).isEqualTo(visibleJob);
+        assertThatThrownBy(()->retentionJobs.require(actor,hiddenJob)).isInstanceOf(java.util.NoSuchElementException.class);
+    }
 
     @Test
     void createsAndFinalizesRequestWithImmutableSnapshotRows() {
@@ -161,7 +205,7 @@ class ConsentRequestPostgresIntegrationTest {
                 consentItem, templateVersion, activityVersion);
         jdbc.update("INSERT INTO seal.consent_item_data_selection(consent_item_definition_id,processing_activity_version_id,processing_data_item_id) VALUES(?,?,?)",
                 consentItem, activityVersion, dataItem);
-        return new Fixture(templateVersion);
+        return new Fixture(templateVersion, activity, retentionVersion);
     }
 
     private UUID fixtureCreator() {
@@ -172,5 +216,5 @@ class ConsentRequestPostgresIntegrationTest {
     }
 
     private UUID id(String sql) { return jdbc.queryForObject(sql, UUID.class); }
-    private record Fixture(UUID templateVersionId) { }
+    private record Fixture(UUID templateVersionId, UUID activityId, UUID retentionVersionId) { }
 }

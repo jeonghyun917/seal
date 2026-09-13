@@ -18,11 +18,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import java.util.Locale;
 
 @Service
 public class ProcessingActivityManagementService {
-    private static final Pattern CODE_PATTERN = Pattern.compile("^[A-Z0-9-]{2,30}$");
     private final ProcessingActivityMapper mapper;
     private final AuditEventWriter auditWriter;
     private final Clock clock;
@@ -36,18 +35,19 @@ public class ProcessingActivityManagementService {
 
     @Transactional
     public UUID create(ProcessingActivityCreateCommand command) {
-        validateIdentity(command.activityCode(), command.activityName());
+        validateName(command.activityName());
         if (!mapper.canAccessActiveOrganization(command.actorId(), command.ownerOrganizationUnitId())
                 || !mapper.canUseApprovedRetentionVersion(command.actorId(), command.retentionPolicyVersionId())) {
             throw notFound();
         }
         UUID activityId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
+        String activityCode = generateActivityCode(activityId);
         ProcessingActivityVersion draft = ProcessingActivityVersion.draft(versionId, activityId, 1,
                 command.processingPurpose(), command.legalBasisType(), command.legalBasisDetail(),
                 command.retentionPolicyVersionId(), command.dataItems(), command.actorId());
         requireOne(mapper.insertActivity(new ProcessingActivityInsert(activityId,
-                command.activityCode(), command.activityName().strip(),
+                activityCode, command.activityName().strip(),
                 command.ownerOrganizationUnitId(), command.actorId())));
         requireOne(mapper.insertVersion(new ProcessingActivityVersionInsert(versionId, activityId, 1,
                 draft.processingPurpose(), draft.legalBasisType(), draft.legalBasisDetail(),
@@ -110,13 +110,14 @@ public class ProcessingActivityManagementService {
                 UUID.randomUUID(), Map.of()));
     }
 
-    private static void validateIdentity(String code, String name) {
-        if (code == null || !CODE_PATTERN.matcher(code).matches()) {
-            throw new IllegalArgumentException("업무코드는 영문 대문자, 숫자, 하이픈 2~30자로 입력해야 합니다.");
-        }
+    private static void validateName(String name) {
         if (name == null || name.isBlank() || name.strip().length() > 100) {
             throw new IllegalArgumentException("업무명은 1~100자로 입력해야 합니다.");
         }
+    }
+
+    private static String generateActivityCode(UUID activityId) {
+        return "PA-" + activityId.toString().replace("-", "").substring(0, 16).toUpperCase(Locale.ROOT);
     }
 
     private static void requireOne(int count) { if (count != 1) throw conflict(); }

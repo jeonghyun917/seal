@@ -28,7 +28,7 @@ public record ConsentItemDefinition(
         }
         code = validateCode(code);
         title = validateText(title, 5, 200, "동의 항목 제목");
-        purpose = validateText(purpose, 5, 1000, "처리 목적");
+        purpose = validateText(purpose, 5, 1000, "개인정보 이용 목적");
         retentionText = validateText(retentionText, 5, 1000, "보유기간 안내");
         refusalNotice = validateText(refusalNotice, 10, 1000, "동의 거부 안내");
         if (type == ConsentItemType.OPTIONAL && required) {

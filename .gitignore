@@ -1,6 +1,8 @@
 # Build outputs
 target/
 *.class
+output/
+outputs/
 
 # IDE
 .idea/

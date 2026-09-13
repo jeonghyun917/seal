@@ -10,6 +10,9 @@ import org.springframework.core.env.Profiles;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
+import org.springframework.security.web.csrf.InvalidCsrfTokenException;
+import org.springframework.security.web.csrf.MissingCsrfTokenException;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -19,6 +22,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, Environment environment) throws Exception {
         boolean localProfile = environment.acceptsProfiles(Profiles.of("local"));
+        var defaultAccessDeniedHandler = new AccessDeniedHandlerImpl();
         http.addFilterAfter(new MustChangePasswordFilter(), UsernamePasswordAuthenticationFilter.class);
         http.authorizeHttpRequests(authorize -> {
                     authorize.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
@@ -27,6 +31,21 @@ public class SecurityConfig {
                     if (localProfile) authorize.requestMatchers("/system/status").permitAll();
                     authorize.anyRequest().authenticated();
                 })
+                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler((request, response, denied) -> {
+                    boolean loginRequest = (request.getContextPath() + "/login")
+                            .equals(request.getRequestURI());
+                    boolean expiredCsrf = denied instanceof MissingCsrfTokenException
+                            || denied instanceof InvalidCsrfTokenException;
+                    if (loginRequest && expiredCsrf) {
+                        var session = request.getSession(false);
+                        if (session != null) {
+                            session.invalidate();
+                        }
+                        response.sendRedirect(request.getContextPath() + "/login?expired");
+                        return;
+                    }
+                    defaultAccessDeniedHandler.handle(request, response, denied);
+                }))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")

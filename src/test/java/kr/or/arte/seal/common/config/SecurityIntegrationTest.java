@@ -20,10 +20,10 @@ class SecurityIntegrationTest {
     private MockMvc mockMvc;
 
     @Test
-    void publicHomeAndStatusPagesDoNotRedirectToLogin() throws Exception {
+    void homeRedirectsToLoginAndStatusRemainsPublic() throws Exception {
         mockMvc.perform(get("/"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("home"));
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/login"));
 
         mockMvc.perform(get("/system/status"))
                 .andExpect(status().isOk())

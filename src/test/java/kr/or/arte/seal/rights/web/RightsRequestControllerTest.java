@@ -25,13 +25,17 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -44,6 +48,51 @@ class RightsRequestControllerTest {
     @MockitoBean RecipientQueryService recipientQueryService;
     @MockitoBean ConsentRequestQueryService consentRequestQueryService;
     @MockitoBean DatabaseAuthenticationProvider authenticationProvider;
+
+    @Test
+    void newFormDoesNotLoadEveryRecipientOrConsentRequest() throws Exception {
+        mvc.perform(get("/admin/rights/new")
+                        .with(authentication(admin("RIGHTS_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/rights/form"));
+
+        then(recipientQueryService).should(never()).search(any(), any(), any());
+        then(consentRequestQueryService).should(never()).search(any(), any());
+    }
+
+    @Test
+    void recipientOptionsReturnsOnePageOfActiveRecipients() throws Exception {
+        var recipient = new RecipientDetail(UUID.randomUUID(), UUID.randomUUID(), "예술교육팀", "교육팀장",
+                "김*술", "ar****@example.com", "권리요청 접수", RecipientStatus.ACTIVE, 0);
+        given(recipientQueryService.searchPickerPage(any(), eq("예술"), eq(2), eq(20)))
+                .willReturn(new kr.or.arte.seal.common.web.AdminPageResult<>(List.of(recipient), 2, 20, true));
+
+        mvc.perform(get("/admin/rights/recipient-options")
+                        .param("keyword", "예술").param("page", "2")
+                        .with(authentication(admin("RIGHTS_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andExpect(jsonPath("$.items[0].recipientId").value(recipient.recipientId().toString()))
+                .andExpect(jsonPath("$.items[0].affiliationName").value("예술교육팀"));
+    }
+
+    @Test
+    void consentRequestOptionsContainOnlyTheSelectedRecipientsRequests() throws Exception {
+        UUID recipientId = UUID.randomUUID();
+        var matching = new kr.or.arte.seal.request.application.ConsentRequestSummary(UUID.randomUUID(),
+                "CR-MATCH", recipientId, kr.or.arte.seal.request.domain.ConsentRequestStatus.ACTIVE,
+                java.time.Instant.parse("2026-09-30T09:00:00Z"), java.time.Instant.parse("2026-09-01T09:00:00Z"), 0);
+        given(consentRequestQueryService.searchByRecipient(any(), eq(recipientId))).willReturn(List.of(matching));
+
+        mvc.perform(get("/admin/rights/consent-request-options")
+                        .param("recipientId", recipientId.toString())
+                        .with(authentication(admin("RIGHTS_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].requestId").value(matching.requestId().toString()))
+                .andExpect(jsonPath("$[0].requestCode").value("CR-MATCH"))
+                .andExpect(jsonPath("$[1]").doesNotExist());
+    }
 
     @Test
     void createDerivesOrganizationFromScopedRecipientInsteadOfPostedOrganization() throws Exception {

@@ -1,6 +1,5 @@
 package kr.or.arte.seal.recipient.web;
 
-import kr.or.arte.seal.admin.application.organization.OrganizationManagement;
 import kr.or.arte.seal.admin.config.AdminPrincipal;
 import kr.or.arte.seal.admin.config.DatabaseAuthenticationProvider;
 import kr.or.arte.seal.common.web.AdminPageResult;
@@ -20,7 +19,10 @@ import java.util.Arrays;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -35,10 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RecipientControllerTest {
     private static final UUID RECIPIENT_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID ORG_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
+    private static final UUID INSTITUTION_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     @Autowired MockMvc mockMvc;
     @MockitoBean RecipientManagementService management;
     @MockitoBean RecipientQueryService query;
-    @MockitoBean OrganizationManagement organizations;
     @MockitoBean DatabaseAuthenticationProvider databaseAuthenticationProvider;
 
     @Test
@@ -49,11 +51,28 @@ class RecipientControllerTest {
 
     @Test
     void permittedAdministratorCanOpenList() throws Exception {
-        given(query.searchPage(any(), any(), any(), any(Integer.class), any(Integer.class)))
+        given(query.searchPage(any(), any(), any(), any(), any(Integer.class), any(Integer.class)))
                 .willReturn(AdminPageResult.of(java.util.List.of(), 1, 20));
         mockMvc.perform(get("/admin/recipients").with(authentication(admin("RECIPIENT_VIEW"))))
                 .andExpect(status().isOk()).andExpect(view().name("admin/recipients/list"))
                 .andExpect(model().attributeExists("recipients", "administrator"));
+    }
+
+    @Test
+    void listPassesEmailAndCollectionBasisSearchTerms() throws Exception {
+        given(query.searchPage(any(), any(), any(), any(), any(Integer.class), any(Integer.class)))
+                .willReturn(AdminPageResult.of(java.util.List.of(), 1, 20));
+
+        mockMvc.perform(get("/admin/recipients")
+                        .param("email", "hong@example.com")
+                        .param("collectionBasis", "교육 참여 신청서")
+                        .with(authentication(admin("RECIPIENT_VIEW"))))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("email", "hong@example.com"))
+                .andExpect(model().attribute("collectionBasis", "교육 참여 신청서"));
+
+        verify(query).searchPage(any(), eq("hong@example.com"), eq("교육 참여 신청서"),
+                any(), eq(1), eq(20));
     }
 
     @Test
@@ -66,10 +85,14 @@ class RecipientControllerTest {
     void validCreateRedirectsToMaskedDetail() throws Exception {
         given(management.create(any())).willReturn(RECIPIENT_ID);
         mockMvc.perform(post("/admin/recipients").with(authentication(admin("RECIPIENT_EDIT"))).with(csrf())
-                        .param("organizationUnitId", ORG_ID.toString()).param("name", "홍길동")
+                        .param("organizationUnitId", ORG_ID.toString()).param("affiliationName", "외부회사")
+                        .param("jobTitle", "교육팀장").param("name", "홍길동")
                         .param("email", "hong@example.com").param("collectionBasis", "교육 참여 신청서 수집"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/admin/recipients/" + RECIPIENT_ID + "?created"));
+
+        verify(management).create(argThat(command -> INSTITUTION_ID.equals(command.organizationUnitId())
+                && "교육팀장".equals(command.jobTitle())));
     }
 
     private static UsernamePasswordAuthenticationToken admin(String... authorities) {

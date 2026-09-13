@@ -22,12 +22,12 @@ spring:
       max-lifetime: 1800000
   mail:
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}
-    port: ${SEAL_SMTP_PORT:25}
+    port: ${SEAL_SMTP_PORT:465}
     test-connection: false
     properties:
       mail.smtp.auth: false
-      mail.smtp.ssl.enable: ${SEAL_SMTP_SSL_ENABLED:false}
-      mail.smtp.ssl.checkserveridentity: ${SEAL_SMTP_SSL_ENABLED:false}
+      mail.smtp.ssl.enable: ${SEAL_SMTP_SSL_ENABLED:true}
+      mail.smtp.ssl.checkserveridentity: ${SEAL_SMTP_SSL_ENABLED:true}
       mail.smtp.starttls.enable: false
       mail.smtp.starttls.required: false
       mail.smtp.connectiontimeout: 5000
@@ -45,6 +45,7 @@ mybatis:
 
 server:
   forward-headers-strategy: framework
+
   servlet:
     encoding:
       charset: UTF-8
@@ -53,6 +54,7 @@ server:
     session:
       timeout: 30m
       cookie:
+        name: SEALSESSION
         http-only: true
         same-site: strict
   error:
@@ -96,8 +98,8 @@ seal:
   mail:
     enabled: ${SEAL_MAIL_ENABLED:false}
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}
-    port: ${SEAL_SMTP_PORT:25}
-    ssl-enabled: ${SEAL_SMTP_SSL_ENABLED:false}
+    port: ${SEAL_SMTP_PORT:465}
+    ssl-enabled: ${SEAL_SMTP_SSL_ENABLED:true}
     auth-enabled: false
     from-address: ${SEAL_MAIL_FROM_ADDRESS:seal@arte.or.kr}
     from-name: ${SEAL_MAIL_FROM_NAME:개인정보 동의 안내}

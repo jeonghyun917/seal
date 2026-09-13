@@ -3,7 +3,6 @@ package kr.or.arte.seal.template.web;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import kr.or.arte.seal.template.domain.ConsentItemType;
 
@@ -12,8 +11,6 @@ import java.util.List;
 import java.util.UUID;
 
 public class ConsentItemForm {
-    @NotBlank @Pattern(regexp = "^[A-Z0-9-]{2,30}$")
-    private String code;
     @NotNull
     private ConsentItemType type = ConsentItemType.COLLECTION_USE;
     @NotBlank @Size(min = 5, max = 200)
@@ -30,8 +27,6 @@ public class ConsentItemForm {
     @NotEmpty
     private List<UUID> processingDataItemIds = new ArrayList<>();
 
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
     public ConsentItemType getType() { return type; }
     public void setType(ConsentItemType type) { this.type = type; }
     public String getTitle() { return title; }

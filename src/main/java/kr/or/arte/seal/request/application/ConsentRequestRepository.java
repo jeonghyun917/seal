@@ -19,6 +19,14 @@ public interface ConsentRequestRepository {
     void insertEvent(UUID requestId, String eventType, String actorType, UUID actorId,
                      String reasonCode, Instant now);
     List<ConsentRequestRecord> searchScoped(UUID actorId, ConsentRequestStatus status); default List<ConsentRequestRecord> searchScoped(UUID actorId,ConsentRequestStatus status,int limit,int offset){return searchScoped(actorId,status).stream().skip(offset).limit(limit).toList();}
+    default List<ConsentRequestRecord> searchScopedByRecipient(UUID actorId, UUID recipientId) {
+        return searchScoped(actorId, null).stream()
+                .filter(row -> recipientId.equals(row.recipientId())).toList();
+    }
+    default List<ConsentRequestRecord> searchScoped(UUID actorId, ConsentRequestStatus status, String query,
+            int limit, int offset) {
+        return searchScoped(actorId, status, limit, offset);
+    }
     default boolean updateDraft(ConsentRequestRecord changed, UUID actorId, Instant now, long versionNo) { return false; }
     default List<ConsentRequestRecord> findDueForUpdate(Instant now, int limit) { return List.of(); }
     default boolean markExpired(UUID requestId, Instant now, long versionNo) { return false; }

@@ -8,6 +8,9 @@ import kr.or.arte.seal.evidence.application.EvidenceVerificationResult;
 import kr.or.arte.seal.evidence.application.EvidenceWorkItem;
 import kr.or.arte.seal.evidence.application.GeneratedEvidence;
 import kr.or.arte.seal.evidence.domain.EvidenceGenerationStatus;
+import kr.or.arte.seal.recipient.crypto.EncryptedValue;
+import kr.or.arte.seal.recipient.crypto.PersonalDataCipher;
+import kr.or.arte.seal.recipient.crypto.PersonalDataContext;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,9 +22,11 @@ import java.util.UUID;
 @Repository
 public class MyBatisEvidenceRepository implements EvidenceRepository {
     private final EvidenceMapper mapper;
+    private final PersonalDataCipher cipher;
 
-    public MyBatisEvidenceRepository(EvidenceMapper mapper) {
+    public MyBatisEvidenceRepository(EvidenceMapper mapper, PersonalDataCipher cipher) {
         this.mapper = mapper;
+        this.cipher = cipher;
     }
 
     public void enqueue(UUID responseId, UUID requestId, Instant at) {
@@ -32,10 +37,21 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
     public List<EvidenceWorkItem> claimDue(Instant now, int limit, Instant lease) {
         return mapper.claimDue(now, limit, lease).stream()
                 .map(row -> new EvidenceWorkItem(row.packageId(), row.responseId(), row.requestId(),
-                        row.organizationId(), row.title(), row.snapshotJson(), row.submittedAt(),
-                        mapper.decisions(row.responseId()), mapper.events(row.requestId()),
-                        row.attemptCount(), row.rowVersion()))
+                        row.organizationId(), row.requestCode(), row.templateCode(),
+                        row.templateName(), row.templateVersionNumber(),
+                        decrypt(row, "name", row.nameCiphertext()),
+                        decrypt(row, "email", row.emailCiphertext()),
+                        row.affiliationName(), row.jobTitle(), row.requestCreatedAt(),
+                        row.firstSentAt(), row.expiresAt(), row.snapshotJson(), row.snapshotHash(),
+                        row.responseStatus(), row.submittedAt(), mapper.decisions(row.responseId()),
+                        mapper.events(row.requestId()), row.attemptCount(), row.rowVersion()))
                 .toList();
+    }
+
+    private String decrypt(EvidenceWorkRow row, String field, byte[] value) {
+        if (value == null || row.encryptionKeyId() == null) return "-";
+        return cipher.decrypt(new PersonalDataContext("RECIPIENT", row.recipientId(),
+                row.organizationId(), field), new EncryptedValue(row.encryptionKeyId(), value));
     }
 
     @Transactional
@@ -59,9 +75,19 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
 
     public Optional<EvidencePackageDetail> findScoped(UUID actorId, UUID id) {
         return mapper.findScoped(actorId, id)
-                .map(row -> new EvidencePackageDetail(row.packageId(), row.requestId(), row.status(),
+                .map(row -> new EvidencePackageDetail(row.packageId(), row.requestId(), row.requestCode(),
+                        row.templateTitle(), row.status(),
                         row.relativePath(), row.manifestSha256(), row.manifestHmac(), row.hmacKeyId(),
                         row.queuedAt(), row.finalizedAt(), row.lastErrorCode(), mapper.files(id)));
+    }
+
+    @Override
+    public Optional<EvidencePackageDetail> findByRequestScoped(UUID actorId, UUID requestId) {
+        return mapper.findByRequestScoped(actorId, requestId)
+                .map(row -> new EvidencePackageDetail(row.packageId(), row.requestId(), row.requestCode(),
+                        row.templateTitle(), row.status(), row.relativePath(), row.manifestSha256(),
+                        row.manifestHmac(), row.hmacKeyId(), row.queuedAt(), row.finalizedAt(),
+                        row.lastErrorCode(), mapper.files(row.packageId())));
     }
 
     public void requeue(UUID actorId, UUID id, Instant now) {

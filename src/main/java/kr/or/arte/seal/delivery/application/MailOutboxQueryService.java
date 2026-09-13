@@ -41,8 +41,15 @@ public class MailOutboxQueryService {
     @Transactional(readOnly = true)
     public kr.or.arte.seal.common.web.AdminPageResult<MailOutboxSummary> searchPage(UUID actorId,
             MailOutboxStatus status,int page,int size){
+        return searchPage(actorId, status, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public kr.or.arte.seal.common.web.AdminPageResult<MailOutboxSummary> searchPage(UUID actorId,
+            MailOutboxStatus status, String query, int page, int size){
         int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
-        var rows=repository.search(actorId,status,safeSize+1,offset).stream()
+        String normalized = query == null || query.isBlank() ? null : query.strip();
+        var rows=repository.search(actorId,status,normalized,safeSize+1,offset).stream()
                 .map(row -> new MailOutboxSummary(row.outboxId(),row.requestId(),row.status(),row.subject(),
                         row.scheduledAt(),row.nextAttemptAt(),row.attemptCount())).toList();
         return kr.or.arte.seal.common.web.AdminPageResult.of(rows,safePage,safeSize);
@@ -53,7 +60,7 @@ public class MailOutboxQueryService {
                 .orElseThrow(() -> new IllegalArgumentException("메일 발송 내역을 찾을 수 없습니다."));
         if (row.status() == MailOutboxStatus.DESTROYED) {
             return new MailOutboxDetail(row.outboxId(), row.requestId(), row.status(), row.subject(),
-                    row.scheduledAt(), row.nextAttemptAt(), row.attemptCount(), null);
+                    row.scheduledAt(), row.nextAttemptAt(), row.smtpAcceptedAt(), row.attemptCount(), null);
         }
         String html = cipher.decrypt(
                 new PersonalDataContext("MAIL_OUTBOX", row.outboxId(), row.organizationId(), "html"),
@@ -62,7 +69,7 @@ public class MailOutboxQueryService {
             throw new IllegalStateException("보관된 이메일 본문의 무결성 검증에 실패했습니다.");
         }
         return new MailOutboxDetail(row.outboxId(), row.requestId(), row.status(), row.subject(),
-                row.scheduledAt(), row.nextAttemptAt(), row.attemptCount(), html);
+                row.scheduledAt(), row.nextAttemptAt(), row.smtpAcceptedAt(), row.attemptCount(), html);
     }
 
     @Transactional

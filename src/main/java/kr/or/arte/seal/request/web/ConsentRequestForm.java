@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public class ConsentRequestForm {
     private UUID recipientId;
+    @jakarta.validation.constraints.Size(max=1000, message="한 번에 최대 1,000명까지 선택할 수 있습니다.")
     private List<UUID> recipientIds = new ArrayList<>();
     @NotNull private UUID templateVersionId;
     @NotBlank private String expiresAt;

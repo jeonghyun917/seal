@@ -8,6 +8,11 @@ public record AdminPrincipal(
         String loginId,
         String displayName,
         UUID organizationUnitId,
-        boolean mustChangePassword
+        boolean mustChangePassword,
+        String securityStamp
 ) implements Serializable {
+    public AdminPrincipal(UUID adminUserId, String loginId, String displayName,
+            UUID organizationUnitId, boolean mustChangePassword) {
+        this(adminUserId, loginId, displayName, organizationUnitId, mustChangePassword, null);
+    }
 }

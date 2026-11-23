@@ -22,6 +22,14 @@
         var selectedList = document.getElementById("dialogSelectedRecipients");
         var resultStatus = document.getElementById("recipientResultStatus");
         var inputs = document.getElementById("selectedRecipientInputs");
+        function addSelection(item) {
+            if (!singleSelection && !draft.has(item.recipientId) && draft.size >= 1000) {
+                resultStatus.textContent = "한 번에 최대 1,000명까지 선택할 수 있습니다. 검색 조건을 좁혀 나누어 등록해 주세요.";
+                return false;
+            }
+            draft.set(item.recipientId, item);
+            return true;
+        }
 
         document.querySelectorAll(".selected-recipient-seed").forEach(function (seed) {
             selected.set(seed.dataset.recipientId, { recipientId: seed.dataset.recipientId,
@@ -78,7 +86,7 @@
                 checkbox.addEventListener("change", function () {
                     if (checkbox.checked) {
                         if (singleSelection) draft.clear();
-                        draft.set(item.recipientId, item);
+                        addSelection(item);
                     } else draft.delete(item.recipientId);
                     renderSelected(); renderResults();
                 });
@@ -111,8 +119,13 @@
                 url.searchParams.set("keyword", search.value.trim()); url.searchParams.set("all", "true");
                 var response = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
                 if (!response.ok) throw new Error("검색 결과 전체를 선택하지 못했습니다.");
-                var data = await response.json(); data.items.forEach(function (item) { draft.set(item.recipientId, item); });
-                resultStatus.textContent = data.items.length + "명을 선택했습니다."; renderSelected();
+                var data = await response.json();
+                var limited = data.hasNext === true;
+                data.items.forEach(function (item) { if (!addSelection(item)) limited = true; });
+                resultStatus.textContent = limited
+                    ? "최대 1,000명까지만 선택했습니다. 전체 검색 결과가 아닙니다. 검색 조건을 좁혀 나누어 등록해 주세요."
+                    : draft.size + "명을 선택했습니다.";
+                renderSelected();
             } catch (error) { resultStatus.textContent = error.message; }
             finally { loading = false; renderResults(); }
         }
@@ -130,7 +143,7 @@
         document.getElementById("nextRecipientPage").addEventListener("click", function () { loadPage(currentPage + 1); });
         var selectCurrentPage = document.getElementById("selectCurrentPage");
         var selectAll = document.getElementById("selectAllResults");
-        if (selectCurrentPage) selectCurrentPage.addEventListener("click", function () { currentItems.forEach(function (item) { draft.set(item.recipientId, item); }); renderSelected(); renderResults(); });
+        if (selectCurrentPage) selectCurrentPage.addEventListener("click", function () { currentItems.forEach(addSelection); renderSelected(); renderResults(); });
         if (selectAll) selectAll.addEventListener("click", selectAllResults);
         renderSummary();
     }

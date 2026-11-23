@@ -44,6 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(value = ConsentRequestController.class, properties = "seal.public-base-url=https://consent.arte.or.kr")
 @Import(SecurityConfig.class)
 class ConsentRequestControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
     private static final UUID REQUEST = UUID.randomUUID();
     @Autowired MockMvc mvc;
     @MockitoBean ConsentRequestManagement management;
@@ -82,6 +84,18 @@ class ConsentRequestControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].affiliationName").value("예술교육팀"));
     }
 
+    @Test void allSelectionReportsTruncationInsteadOfClaimingEveryRecipient() throws Exception {
+        var recipient = new kr.or.arte.seal.recipient.application.RecipientDetail(
+                UUID.randomUUID(), UUID.randomUUID(), "기관", "담당자", "김*술", "a***@example.com",
+                "등록 근거", kr.or.arte.seal.recipient.domain.RecipientStatus.ACTIVE, 0);
+        given(recipients.searchPicker(any(),eq(""))).willReturn(java.util.Collections.nCopies(1001,recipient));
+        mvc.perform(get("/admin/requests/recipient-options").param("all","true")
+                        .with(authentication(admin("CONSENT_REQUEST_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items.length()").value(1000))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.hasNext").value(true));
+    }
+
     @Test
     void createRejectsRequestWhenNoRecipientsAreSelected() throws Exception {
         mvc.perform(post("/admin/requests")
@@ -92,6 +106,27 @@ class ConsentRequestControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/requests/form"))
                 .andExpect(model().attributeHasFieldErrors("requestForm", "recipientIds"));
+
+        verifyNoInteractions(management);
+    }
+
+    @Test
+    void createKeepsExpiredDateErrorOnTheRequestForm() throws Exception {
+        UUID recipientId = UUID.randomUUID();
+        UUID templateVersionId = UUID.randomUUID();
+        given(management.createBatch(any(), any())).willReturn(java.util.List.of(
+                new kr.or.arte.seal.request.application.ConsentRequestCreateResult(
+                        UUID.randomUUID(), "CR-TEST", false)));
+
+        mvc.perform(post("/admin/requests")
+                        .param("recipientIds", recipientId.toString())
+                        .param("templateVersionId", templateVersionId.toString())
+                        .param("expiresAt", "2000-01-01T00:00")
+                        .param("idempotencyKey", UUID.randomUUID().toString())
+                        .with(csrf()).with(authentication(admin("CONSENT_REQUEST_EDIT"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("admin/requests/form"))
+                .andExpect(model().attributeHasFieldErrors("requestForm", "expiresAt"));
 
         verifyNoInteractions(management);
     }

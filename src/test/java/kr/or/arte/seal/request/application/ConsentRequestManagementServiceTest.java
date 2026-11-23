@@ -27,6 +27,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ConsentRequestManagementServiceTest {
+    @Test void oversizedBatchIsRejectedBeforeCreatingRequests() {
+        var ids=java.util.stream.IntStream.range(0,1001).mapToObj(i->UUID.randomUUID()).toList();
+        org.assertj.core.api.Assertions.assertThatThrownBy(()->service.createBatch(ACTOR,
+                new CreateConsentRequestBatchCommand(ids,TEMPLATE_VERSION,NOW.plusSeconds(3600),UUID.randomUUID())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("1,000");
+    }
     private static final Instant NOW = Instant.parse("2026-08-24T05:00:00Z");
     private static final UUID ACTOR = UUID.randomUUID();
     private static final UUID ORG = UUID.randomUUID();

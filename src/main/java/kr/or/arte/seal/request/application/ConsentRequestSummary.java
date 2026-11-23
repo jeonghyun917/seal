@@ -7,4 +7,9 @@ import java.util.UUID;
 
 public record ConsentRequestSummary(UUID requestId, String requestCode, UUID recipientId,
                                     ConsentRequestStatus status, Instant expiresAt,
-                                    Instant createdAt, long versionNo) { }
+                                    Instant createdAt, long versionNo, UUID templateVersionId) {
+    public ConsentRequestSummary(UUID requestId,String requestCode,UUID recipientId,ConsentRequestStatus status,
+            Instant expiresAt,Instant createdAt,long versionNo) {
+        this(requestId,requestCode,recipientId,status,expiresAt,createdAt,versionNo,null);
+    }
+}

@@ -20,10 +20,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, Environment environment) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, Environment environment,
+            kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard) throws Exception {
         boolean localProfile = environment.acceptsProfiles(Profiles.of("local"));
         var defaultAccessDeniedHandler = new AccessDeniedHandlerImpl();
         http.addFilterAfter(new MustChangePasswordFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(new kr.or.arte.seal.admin.config.AdminSessionValidityFilter(sessionGuard),
+                UsernamePasswordAuthenticationFilter.class);
         http.authorizeHttpRequests(authorize -> {
                     authorize.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
                             .requestMatchers("/", "/login", "/resources/**", "/consent/**",

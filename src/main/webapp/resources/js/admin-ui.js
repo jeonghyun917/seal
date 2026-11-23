@@ -157,11 +157,13 @@
 
         const dirtyForms = new Set();
         const markDirty = event => {
-            const form = event.target.closest("form[data-unsaved-warning], form.template-editor");
+            const form = event.target.closest("form[data-unsaved-warning], form.template-editor, form.data-form[method='post'], form.stack-form[method='post']");
+            if (form?.querySelector('input[autocomplete="current-password"]')) return;
             if (form) dirtyForms.add(form);
         };
         document.addEventListener("input", markDirty);
         document.addEventListener("change", markDirty);
+        document.addEventListener("recipient-picker:applied", markDirty, true);
         window.addEventListener("beforeunload", event => {
             if ([...dirtyForms].some(form => !form.classList.contains("is-submitting"))) {
                 event.preventDefault();

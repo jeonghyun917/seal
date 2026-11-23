@@ -8,6 +8,10 @@ import java.util.*;
 
 @Mapper
 public interface EvidenceMapper {
+    UUID lockRequest(@Param("requestId") UUID requestId);
+    boolean hasStartedDestruction(@Param("requestId") UUID requestId);
+    Optional<UUID> lockPublishableClaim(@Param("packageId") UUID packageId,
+            @Param("requestId") UUID requestId, @Param("claimedRowVersion") long claimedRowVersion);
     void enqueue(@Param("packageId") UUID packageId,@Param("responseId") UUID responseId,
                  @Param("requestId") UUID requestId,@Param("now") Instant now);
     List<EvidenceWorkRow> claimDue(@Param("now") Instant now,@Param("limit") int limit,
@@ -19,7 +23,11 @@ public interface EvidenceMapper {
     int insertFile(@Param("packageId") UUID packageId,@Param("file") EvidenceFileMetadata file,
                    @Param("now") Instant now);
     int fail(@Param("packageId") UUID packageId,@Param("claimedRowVersion") long claimedRowVersion,@Param("code") String code,@Param("now") Instant now);
-    List<EvidencePackageSummary> search(@Param("actorId") UUID actorId,@Param("status") EvidenceGenerationStatus status,@Param("limit") int limit,@Param("offset") int offset);
+    default List<EvidencePackageSummary> search(UUID actorId, EvidenceGenerationStatus status, int limit, int offset) {
+        return search(actorId, status, EvidenceSearchFilter.of(null, null, null), limit, offset);
+    }
+    List<EvidencePackageSummary> search(@Param("actorId") UUID actorId, @Param("status") EvidenceGenerationStatus status,
+            @Param("filter") EvidenceSearchFilter filter, @Param("limit") int limit, @Param("offset") int offset);
     Optional<EvidencePackageRow> findScoped(@Param("actorId") UUID actorId,@Param("packageId") UUID packageId);
     Optional<EvidencePackageRow> findByRequestScoped(@Param("actorId") UUID actorId,
             @Param("requestId") UUID requestId);

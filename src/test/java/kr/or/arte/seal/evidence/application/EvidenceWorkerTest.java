@@ -47,6 +47,9 @@ class EvidenceWorkerTest {
                     "교육 참여 동의", "{}", now, List.of("필수: AGREE"), List.of("SUBMITTED"), 0, 7));
         }
         public void finalized(UUID id, long claimedVersion, GeneratedEvidence value, Instant at) { finalized = value; finalizedVersion = claimedVersion; }
+        public void generateAndFinalize(EvidenceWorkItem item, EvidenceArtifactGenerator generator, Instant at) {
+            finalized(item.packageId(), item.rowVersion(), generator.generate(item), at);
+        }
         public void failed(UUID id, long claimedVersion, String code, Instant at) { failedCode = code; }
         public List<EvidencePackageSummary> search(UUID actorId, EvidenceGenerationStatus status) { return List.of(); }
         public Optional<EvidencePackageDetail> findScoped(UUID actorId, UUID packageId) { return Optional.empty(); }

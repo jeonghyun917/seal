@@ -47,6 +47,9 @@ class EvidenceWorkerClaimLossTest {
             if (id.equals(first.packageId())) throw new EvidenceClaimLostException();
             finalizedIds.add(id);
         }
+        public void generateAndFinalize(EvidenceWorkItem item, EvidenceArtifactGenerator generator, Instant at) {
+            finalized(item.packageId(), item.rowVersion(), generator.generate(item), at);
+        }
         public void failed(UUID id, long version, String code, Instant now) {
             failedIds.add(id);
         }

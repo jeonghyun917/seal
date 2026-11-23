@@ -43,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(RightsRequestController.class)
 @Import({SecurityConfig.class, AdminWebExceptionHandler.class})
 class RightsRequestControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
     @Autowired MockMvc mvc;
     @MockitoBean RightsRequestService service;
     @MockitoBean RecipientQueryService recipientQueryService;

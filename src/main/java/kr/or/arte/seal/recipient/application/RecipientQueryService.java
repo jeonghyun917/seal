@@ -26,6 +26,15 @@ public class RecipientQueryService {
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND)));
     }
 
+    public Map<UUID,RecipientDetail> findMany(UUID actorId, Collection<UUID> recipientIds) {
+        var ids=recipientIds.stream().filter(Objects::nonNull).distinct().toList();
+        if(ids.isEmpty()) return Map.of();
+        if(ids.size()>1000) throw new IllegalArgumentException("수신자 일괄 조회는 1,000명 이하여야 합니다.");
+        Map<UUID,RecipientDetail> found=new HashMap<>();
+        repository.findManyScoped(actorId,ids).forEach(row->found.put(row.recipientId(),toDetail(row)));
+        return Map.copyOf(found);
+    }
+
     public List<RecipientDetail> search(UUID actorId, String emailKeyword, RecipientStatus status) {
         return search(actorId, emailKeyword, null, status);
     }
@@ -37,10 +46,7 @@ public class RecipientQueryService {
         if (normalizedEmailKeyword == null) {
             return repository.searchScoped(actorId, null, basis, status).stream().map(this::toDetail).toList();
         }
-        return scopedCandidates(actorId, basis, status).stream()
-                .map(record -> toDetailWhenEmailContains(record, normalizedEmailKeyword))
-                .flatMap(Optional::stream)
-                .toList();
+        return scanEmailMatches(actorId, basis, status, normalizedEmailKeyword, 0, Integer.MAX_VALUE);
     }
 
     public kr.or.arte.seal.common.web.AdminPageResult<RecipientDetail> searchPage(UUID actorId, String exactEmail,
@@ -57,14 +63,15 @@ public class RecipientQueryService {
             rows=repository.searchScoped(actorId,null,basis,status,safeSize+1,offset).stream()
                     .map(this::toDetail).toList();
         } else {
-            rows=search(actorId,exactEmail,basis,status).stream().skip(offset).limit(safeSize+1L).toList();
+            rows=scanEmailMatches(actorId,basis,status,normalizeEmailKeyword(exactEmail),offset,safeSize+1);
         }
         return kr.or.arte.seal.common.web.AdminPageResult.of(rows,safePage,safeSize);
     }
 
     public List<RecipientDetail> searchPicker(UUID actorId, String keyword) {
         String normalized = keyword == null ? "" : keyword.strip().toLowerCase(Locale.ROOT);
-        return scanPickerMatches(actorId, normalized, 0, Integer.MAX_VALUE);
+        // One extra row lets the caller report truncation instead of silently claiming all were selected.
+        return scanPickerMatches(actorId, normalized, 0, 1001);
     }
 
     public kr.or.arte.seal.common.web.AdminPageResult<RecipientDetail> searchPickerPage(
@@ -116,13 +123,19 @@ public class RecipientQueryService {
         return keyword == null ? null : keyword.toLowerCase(Locale.ROOT);
     }
 
-    private List<RecipientStoredRecord> scopedCandidates(UUID actorId, String collectionBasis,
-            RecipientStatus status) {
-        List<RecipientStoredRecord> found = new ArrayList<>();
+    private List<RecipientDetail> scanEmailMatches(UUID actorId, String collectionBasis,
+            RecipientStatus status, String keyword, int matchesToSkip, int resultLimit) {
+        List<RecipientDetail> found = new ArrayList<>();
         for (int offset = 0; ; offset += 100) {
             List<RecipientStoredRecord> batch = repository.searchScoped(actorId, null,
                     collectionBasis, status, 100, offset);
-            found.addAll(batch);
+            for (var record : batch) {
+                var match = toDetailWhenEmailContains(record, keyword);
+                if (match.isEmpty()) continue;
+                if (matchesToSkip > 0) { matchesToSkip--; continue; }
+                found.add(match.get());
+                if (found.size() == resultLimit) return List.copyOf(found);
+            }
             if (batch.size() < 100) break;
         }
         return List.copyOf(found);

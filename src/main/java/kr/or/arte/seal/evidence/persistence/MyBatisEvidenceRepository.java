@@ -1,9 +1,11 @@
 package kr.or.arte.seal.evidence.persistence;
 
 import kr.or.arte.seal.evidence.application.EvidenceClaimLostException;
+import kr.or.arte.seal.evidence.application.EvidenceArtifactGenerator;
 import kr.or.arte.seal.evidence.application.EvidencePackageDetail;
 import kr.or.arte.seal.evidence.application.EvidencePackageSummary;
 import kr.or.arte.seal.evidence.application.EvidenceRepository;
+import kr.or.arte.seal.evidence.application.EvidenceSearchFilter;
 import kr.or.arte.seal.evidence.application.EvidenceVerificationResult;
 import kr.or.arte.seal.evidence.application.EvidenceWorkItem;
 import kr.or.arte.seal.evidence.application.GeneratedEvidence;
@@ -29,7 +31,12 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
         this.cipher = cipher;
     }
 
+    @Transactional
     public void enqueue(UUID responseId, UUID requestId, Instant at) {
+        mapper.lockRequest(requestId);
+        if (mapper.hasStartedDestruction(requestId)) {
+            throw new IllegalStateException("파기가 시작된 요청에는 응답을 등록할 수 없습니다.");
+        }
         mapper.enqueue(UUID.randomUUID(), responseId, requestId, at);
     }
 
@@ -52,6 +59,17 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
         if (value == null || row.encryptionKeyId() == null) return "-";
         return cipher.decrypt(new PersonalDataContext("RECIPIENT", row.recipientId(),
                 row.organizationId(), field), new EncryptedValue(row.encryptionKeyId(), value));
+    }
+
+    @Transactional
+    public void generateAndFinalize(EvidenceWorkItem item, EvidenceArtifactGenerator generator, Instant now) {
+        // Keep the request lock through file publication and the DB commit. Destruction and
+        // new holds use this same lock, so no package can be published after execution starts.
+        mapper.lockRequest(item.requestId());
+        if (mapper.lockPublishableClaim(item.packageId(), item.requestId(), item.rowVersion()).isEmpty()) {
+            throw new EvidenceClaimLostException();
+        }
+        finalized(item.packageId(), item.rowVersion(), generator.generate(item), now);
     }
 
     @Transactional
@@ -104,5 +122,10 @@ public class MyBatisEvidenceRepository implements EvidenceRepository {
     public List<EvidencePackageSummary> search(UUID actor, EvidenceGenerationStatus status,
             int limit, int offset) {
         return mapper.search(actor, status, limit, offset);
+    }
+    @Override
+    public List<EvidencePackageSummary> search(UUID actor, EvidenceGenerationStatus status,
+            EvidenceSearchFilter filter, int limit, int offset) {
+        return mapper.search(actor, status, filter, limit, offset);
     }
 }

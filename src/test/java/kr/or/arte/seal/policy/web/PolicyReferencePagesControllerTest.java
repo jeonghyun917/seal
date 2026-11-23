@@ -39,6 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({RetentionPolicyController.class, ProcessingActivityController.class})
 @Import(SecurityConfig.class)
 class PolicyReferencePagesControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
     @Autowired MockMvc mockMvc;
     @MockitoBean RetentionPolicyQuery retentionPolicyQuery;
     @MockitoBean RetentionPolicyManagementService retentionPolicyManagementService;

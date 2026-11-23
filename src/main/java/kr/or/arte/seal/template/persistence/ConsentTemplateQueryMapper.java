@@ -12,6 +12,7 @@ import java.util.UUID;
 
 @Mapper
 public interface ConsentTemplateQueryMapper {
+    List<PublishedConsentTemplateOption> findVersionOptions(@Param("actorId") UUID actorId,@Param("ids") List<UUID> ids);
     List<ConsentTemplateSummary> search(@Param("actorId") UUID actorId,
                                         @Param("keyword") String keyword,
                                         @Param("status") String status);

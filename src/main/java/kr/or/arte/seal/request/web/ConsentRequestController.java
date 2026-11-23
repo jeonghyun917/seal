@@ -45,7 +45,8 @@ public class ConsentRequestController {
 
     public ConsentRequestController(ConsentRequestManagement management, ConsentRequestQueryService query,
             ConsentDeliveryService delivery, RecipientQueryService recipients,
-            PublishedConsentTemplateQuery templates, ObjectMapper objectMapper, @Value("${seal.public-base-url}") String publicBaseUrl) {
+            PublishedConsentTemplateQuery templates, ObjectMapper objectMapper,
+            @Value("${seal.public-base-url}") String publicBaseUrl) {
         this.management=management; this.query=query; this.delivery=delivery;
         this.recipients=recipients; this.templates=templates; this.publicBaseUrl=normalizeBaseUrl(publicBaseUrl);
         this.snapshotPresenter = new ConsentRequestSnapshotPresenter(objectMapper);
@@ -56,9 +57,10 @@ public class ConsentRequestController {
             @RequestParam(required=false) String q, @RequestParam(defaultValue="1") int page,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         base(principal, model); var pageResult=query.searchPage(principal.adminUserId(),status,q,page,20);
+        var recipientDetails=recipients.findMany(principal.adminUserId(),pageResult.items().stream().map(item->item.recipientId()).toList());
+        var templateOptions=templates.findVersionOptions(principal.adminUserId(),pageResult.items().stream().map(item->item.templateVersionId()).toList());
         var items=pageResult.items().stream().map(item->new RequestListItem(item,
-                recipients.find(principal.adminUserId(),item.recipientId()),
-                templates.findVersionOption(principal.adminUserId(),query.require(principal.adminUserId(),item.requestId()).templateVersionId()).orElse(null))).toList();
+                recipientDetails.get(item.recipientId()),templateOptions.get(item.templateVersionId()))).toList();
         model.addAttribute("requests",items); model.addAttribute("pageResult",pageResult);
         model.addAttribute("selectedStatus", status); model.addAttribute("q", q);
         model.addAttribute("statusOptions", ConsentRequestStatus.values()); return "admin/requests/list";
@@ -77,9 +79,9 @@ public class ConsentRequestController {
             @RequestParam(defaultValue="1") int page, @RequestParam(defaultValue="false") boolean all,
             @AuthenticationPrincipal AdminPrincipal principal) {
         if (all) {
-            List<RecipientOption> items = recipients.searchPicker(principal.adminUserId(), keyword).stream()
-                    .limit(1000).map(RecipientOption::from).toList();
-            return new RecipientOptionsResponse(items, 1, false);
+            var matches = recipients.searchPicker(principal.adminUserId(), keyword);
+            List<RecipientOption> items = matches.stream().limit(1000).map(RecipientOption::from).toList();
+            return new RecipientOptionsResponse(items, 1, matches.size() > 1000);
         }
         var result = recipients.searchPickerPage(principal.adminUserId(), keyword, page, 20);
         return new RecipientOptionsResponse(result.items().stream().map(RecipientOption::from).toList(),
@@ -89,9 +91,7 @@ public class ConsentRequestController {
     @PostMapping("/admin/requests") @PreAuthorize("hasAuthority('CONSENT_REQUEST_EDIT')")
     public String create(@Valid @ModelAttribute("requestForm") ConsentRequestForm form, BindingResult result,
             @AuthenticationPrincipal AdminPrincipal principal, Model model, RedirectAttributes redirect) {
-        java.time.Instant expires = null;
-        try { expires = LocalDateTime.parse(form.getExpiresAt()).atZone(KOREA).toInstant(); }
-        catch (RuntimeException exception) { result.rejectValue("expiresAt", "invalid", "올바른 만료일시를 입력해 주세요."); }
+        java.time.Instant expires = parseExpiry(form, result);
         if (form.getRecipientIds() == null || form.getRecipientIds().isEmpty()) {
             result.rejectValue("recipientIds", "required", "동의 수신자를 한 명 이상 선택해 주세요.");
         }
@@ -123,9 +123,7 @@ public class ConsentRequestController {
     public String update(@PathVariable UUID requestId,
             @Valid @ModelAttribute("requestForm") ConsentRequestForm form, BindingResult result,
             @AuthenticationPrincipal AdminPrincipal principal, Model model) {
-        java.time.Instant expires=null;
-        try { expires=LocalDateTime.parse(form.getExpiresAt()).atZone(KOREA).toInstant(); }
-        catch(RuntimeException exception){result.rejectValue("expiresAt","invalid","올바른 만료일시를 입력해 주세요.");}
+        java.time.Instant expires = parseExpiry(form, result);
         if (form.getRecipientId() == null) result.rejectValue("recipientId", "required", "동의 수신자를 선택해 주세요.");
         if(result.hasErrors()){model.addAttribute("editing",true);model.addAttribute("requestId",requestId);populateOptions(principal,model,true);return "admin/requests/form";}
         management.updateDraft(principal.adminUserId(),requestId,new UpdateConsentRequestCommand(
@@ -203,6 +201,20 @@ public class ConsentRequestController {
             try { return recipients.find(principal.adminUserId(), id); }
             catch (RuntimeException ignored) { return null; }
         }).filter(java.util.Objects::nonNull).toList());
+    }
+    private java.time.Instant parseExpiry(ConsentRequestForm form, BindingResult result) {
+        java.time.Instant expires;
+        try {
+            expires = LocalDateTime.parse(form.getExpiresAt()).atZone(KOREA).toInstant();
+        } catch (RuntimeException exception) {
+            result.rejectValue("expiresAt", "invalid", "올바른 만료일시를 입력해 주세요.");
+            return null;
+        }
+        if (!expires.isAfter(java.time.Instant.now())) {
+            result.rejectValue("expiresAt", "future", "응답 만료일시는 현재 이후로 설정해 주세요.");
+            return null;
+        }
+        return expires;
     }
     public record RecipientOptionsResponse(List<RecipientOption> items, int page, boolean hasNext) { }
     public record RequestListItem(kr.or.arte.seal.request.application.ConsentRequestSummary summary,

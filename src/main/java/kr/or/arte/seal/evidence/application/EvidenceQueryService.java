@@ -40,23 +40,35 @@ public class EvidenceQueryService {
     }
 
     public List<EvidencePackageListItem> search(UUID actor, EvidenceGenerationStatus status) {
-        return repository.search(actor, status).stream().map(item -> listItem(actor, item)).toList();
+        return listItems(actor, repository.search(actor, status));
     }
 
     public kr.or.arte.seal.common.web.AdminPageResult<EvidencePackageListItem> searchPage(UUID actor,
-            EvidenceGenerationStatus status,int page,int size){
-        int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
+            EvidenceGenerationStatus status, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(100, size));
         return kr.or.arte.seal.common.web.AdminPageResult.of(
-                repository.search(actor,status,safeSize+1,offset).stream()
-                        .map(item -> listItem(actor, item)).toList(),safePage,safeSize);
+                listItems(actor, repository.search(actor, status, safeSize + 1, (safePage - 1) * safeSize)),
+                safePage, safeSize);
     }
 
-    private EvidencePackageListItem listItem(UUID actor, EvidencePackageSummary item) {
-        var recipient = recipients.find(actor, item.recipientId());
-        return new EvidencePackageListItem(item.packageId(), item.requestCode(), item.templateTitle(),
-                recipient.maskedName(), recipient.maskedEmail(),
-                EvidencePackageListItem.summarizeResponse(item.agreedCount(), item.decisionCount()),
-                item.status(), item.queuedAt(), item.finalizedAt(), item.attemptCount(), item.lastErrorCode());
+    public kr.or.arte.seal.common.web.AdminPageResult<EvidencePackageListItem> searchPage(UUID actor,
+            EvidenceGenerationStatus status, EvidenceSearchFilter filter, int page, int size) {
+        int safePage = Math.max(1, page), safeSize = Math.max(1, Math.min(100, size));
+        return kr.or.arte.seal.common.web.AdminPageResult.of(
+                listItems(actor, repository.search(actor, status, filter, safeSize + 1, (safePage - 1) * safeSize)),
+                safePage, safeSize);
+    }
+
+    private List<EvidencePackageListItem> listItems(UUID actor, List<EvidencePackageSummary> items) {
+        var details = recipients.findMany(actor, items.stream().map(EvidencePackageSummary::recipientId).toList());
+        return items.stream().map(item -> {
+            var recipient = details.get(item.recipientId());
+            return new EvidencePackageListItem(item.packageId(), item.requestCode(), item.templateTitle(),
+                    recipient == null ? "수신자 정보 없음" : recipient.maskedName(),
+                    recipient == null ? "-" : recipient.maskedEmail(),
+                    EvidencePackageListItem.summarizeResponse(item.agreedCount(), item.decisionCount()),
+                    item.status(), item.queuedAt(), item.finalizedAt(), item.attemptCount(), item.lastErrorCode());
+        }).toList();
     }
 
     public EvidencePackageDetail require(UUID actor, UUID id) {

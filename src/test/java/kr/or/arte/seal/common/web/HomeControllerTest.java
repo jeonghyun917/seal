@@ -17,6 +17,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {HomeController.class, SystemStatusController.class})
 @Import(SecurityConfig.class)
 class HomeControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
 
     @Autowired
     private MockMvc mockMvc;

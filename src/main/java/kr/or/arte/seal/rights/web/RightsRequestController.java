@@ -36,6 +36,7 @@ public class RightsRequestController {
             @RequestParam(defaultValue = "1") int page, @AuthenticationPrincipal AdminPrincipal principal, Model model) {
         model.addAttribute("administrator", principal);
         var pageResult=service.searchPage(principal.adminUserId(),status,page,20); model.addAttribute("items",pageResult.items()); model.addAttribute("pageResult",pageResult);
+        model.addAttribute("recipientDetails", recipients.findMany(principal.adminUserId(), pageResult.items().stream().map(kr.or.arte.seal.rights.application.RightsRequestSummary::recipientId).toList()));
         model.addAttribute("selectedStatus", status);
         return "admin/rights/list";
     }

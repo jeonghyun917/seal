@@ -79,6 +79,14 @@
         FOR UPDATE
     </select>
 
+    <select id="findManyScoped" resultMap="recipientRecord">
+        <include refid="visibleOrganizationScope"/>
+        SELECT <include refid="recipientColumns"/> FROM seal.recipient recipient
+        WHERE EXISTS (SELECT 1 FROM visible_scope scope WHERE scope.organization_unit_id=recipient.organization_unit_id)
+        AND recipient.recipient_id IN
+        <foreach collection="recipientIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
     <update id="update">
         UPDATE seal.recipient SET
             affiliation_name = #{record.affiliationName,jdbcType=VARCHAR},

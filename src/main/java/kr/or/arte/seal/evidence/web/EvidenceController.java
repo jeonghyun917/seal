@@ -17,7 +17,24 @@ import java.util.UUID;
 @RequestMapping({"/admin/evidence","/admin/evidence-packages"})
 public class EvidenceController {
     private final EvidenceQueryService service;public EvidenceController(EvidenceQueryService service){this.service=service;}
-    @GetMapping @PreAuthorize("hasAuthority('EVIDENCE_VIEW')") public String list(@RequestParam(required=false)EvidenceGenerationStatus status,@RequestParam(defaultValue="1")int page,@AuthenticationPrincipal AdminPrincipal p,Model m){m.addAttribute("administrator",p);var result=service.searchPage(p.adminUserId(),status,page,20);m.addAttribute("items",result.items());m.addAttribute("pageResult",result);m.addAttribute("selectedStatus",status);return "admin/evidence/list";}
+    @GetMapping @PreAuthorize("hasAuthority('EVIDENCE_VIEW')")
+    public String list(@RequestParam(required=false) EvidenceGenerationStatus status,
+            @RequestParam(defaultValue="1") int page, @RequestParam(required=false) String q,
+            @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @AuthenticationPrincipal AdminPrincipal p, Model m) {
+        m.addAttribute("administrator", p);
+        m.addAttribute("selectedStatus", status);
+        try {
+            var result = service.searchPage(p.adminUserId(), status, EvidenceSearchFilter.of(q, from, to), page, 20);
+            m.addAttribute("items", result.items());
+            m.addAttribute("pageResult", result);
+        } catch (IllegalArgumentException exception) {
+            m.addAttribute("searchError", exception.getMessage());
+            m.addAttribute("items", java.util.List.of());
+        }
+        return "admin/evidence/list";
+    }
     @GetMapping("/{id}") @PreAuthorize("hasAuthority('EVIDENCE_VIEW')") public String detail(@PathVariable UUID id,@AuthenticationPrincipal AdminPrincipal p,Model m){m.addAttribute("administrator",p);m.addAttribute("item",service.require(p.adminUserId(),id));return "admin/evidence/detail";}
     @GetMapping("/request/{requestId}") @PreAuthorize("hasAuthority('EVIDENCE_VIEW')") public String requestEvidence(@PathVariable UUID requestId,@AuthenticationPrincipal AdminPrincipal p,org.springframework.web.servlet.mvc.support.RedirectAttributes redirect){return service.findByRequest(p.adminUserId(),requestId).map(item->"redirect:/admin/evidence/"+item.packageId()).orElseGet(()->{redirect.addFlashAttribute("notice","이 요청의 완료 증적이 아직 생성되지 않았습니다.");return "redirect:/admin/requests/"+requestId;});}
     @PostMapping("/{id}/retry") @PreAuthorize("hasAuthority('EVIDENCE_GENERATE')") public String retry(@PathVariable UUID id,@AuthenticationPrincipal AdminPrincipal p){service.requeue(p.adminUserId(),id);return "redirect:/admin/evidence/"+id;}

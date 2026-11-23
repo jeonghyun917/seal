@@ -97,6 +97,9 @@ seal:
     password: ${SEAL_BOOTSTRAP_ADMIN_PASSWORD:}
   mail:
     enabled: ${SEAL_MAIL_ENABLED:false}
+    # Sequential batch, then pause. This is not a per-second sending rate.
+    batch-size: ${SEAL_MAIL_BATCH_SIZE:20}
+    poll-delay: ${SEAL_MAIL_POLL_DELAY:60s}
     host: ${SEAL_SMTP_HOST:relay.govkorea.com}
     port: ${SEAL_SMTP_PORT:465}
     ssl-enabled: ${SEAL_SMTP_SSL_ENABLED:true}

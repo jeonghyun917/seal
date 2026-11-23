@@ -46,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import(SecurityConfig.class)
 class AdminSecurityMvcTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
 
     @Autowired
     private MockMvc mockMvc;
@@ -82,6 +84,31 @@ class AdminSecurityMvcTest {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("admin/login"));
+    }
+
+    @Test
+    void revokedSessionCannotReachAdministratorPage() throws Exception {
+        given(sessionGuard.isInvalid(any())).willReturn(true);
+        mockMvc.perform(get("/admin").with(user("revoked-admin")))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?revoked"));
+        org.mockito.Mockito.verifyNoInteractions(statisticsQueryService);
+    }
+
+    @Test
+    void securityLookupFailureDoesNotAllowAdministratorAccess() throws Exception {
+        given(sessionGuard.isInvalid(any())).willThrow(new IllegalStateException("database unavailable"));
+        mockMvc.perform(get("/admin").with(user("admin")))
+                .andExpect(status().isServiceUnavailable());
+        org.mockito.Mockito.verifyNoInteractions(statisticsQueryService);
+    }
+
+    @Test
+    void revokedLoginExplainsWhyLoginIsRequiredAgain() throws Exception {
+        mockMvc.perform(get("/login").param("revoked", ""))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("errorMessage",
+                        "계정 또는 접근 권한이 변경되어 로그아웃되었습니다. 다시 로그인해 주세요."));
     }
 
     @Test

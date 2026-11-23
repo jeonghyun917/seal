@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css?v=20260906-3">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/recipient-request.css?v=20260831-2">
     <script defer src="${pageContext.request.contextPath}/resources/js/expiry-picker.js?v=20260827-1"></script>
-    <c:if test="${not editing}"><script defer src="${pageContext.request.contextPath}/resources/js/recipient-picker.js?v=20260831-2"></script></c:if>
+    <c:if test="${not editing}"><script defer src="${pageContext.request.contextPath}/resources/js/recipient-picker.js?v=20260929-1"></script></c:if>
 </head>
 <body class="admin-body">
 <jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
@@ -38,7 +38,7 @@
                         <div class="recipient-dialog-shell">
                             <header><div><span>RECIPIENT SELECTOR</span><h2>동의 수신자 선택</h2><p>검색 결과는 20명씩 표시되며 페이지를 이동해도 선택은 유지됩니다.</p></div><button id="closeRecipientPicker" class="dialog-close" type="button" aria-label="닫기">×</button></header>
                             <div class="recipient-dialog-search"><input id="recipientSearch" type="search" placeholder="소속기관, 직책, 이름, 이메일 또는 등록 근거 검색" aria-label="동의 수신자 검색"><button id="searchRecipients" class="secondary-button" type="button">검색</button></div>
-                            <div class="recipient-dialog-actions"><button id="selectCurrentPage" type="button">현재 페이지 전체 선택</button><button id="selectAllResults" type="button">검색 결과 전체 선택</button><span id="recipientResultStatus" aria-live="polite"></span></div>
+                            <div class="recipient-dialog-actions"><button id="selectCurrentPage" type="button">현재 페이지 전체 선택</button><button id="selectAllResults" type="button">검색 결과 선택 (최대 1,000명)</button><span id="recipientResultStatus" aria-live="polite"></span></div>
                             <div class="recipient-dialog-body">
                                 <section class="recipient-results-panel" aria-labelledby="recipientResultsTitle"><h3 id="recipientResultsTitle">검색 결과</h3><div id="recipientResults" class="recipient-results"><p class="recipient-empty">수신자를 불러오는 중입니다.</p></div><nav class="recipient-pagination" aria-label="수신자 검색 결과 페이지"><button id="previousRecipientPage" type="button">이전</button><span id="recipientPageLabel">1페이지</span><button id="nextRecipientPage" type="button">다음</button></nav></section>
                                 <aside class="recipient-selected-panel"><div><h3>선택한 수신자</h3><strong id="dialogSelectedCount">0명</strong></div><div id="dialogSelectedRecipients" class="dialog-selected-recipients"><p class="recipient-empty">선택된 수신자가 없습니다.</p></div></aside>

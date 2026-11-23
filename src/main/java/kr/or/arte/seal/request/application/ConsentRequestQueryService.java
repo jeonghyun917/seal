@@ -16,14 +16,14 @@ public class ConsentRequestQueryService {
     public List<ConsentRequestSummary> search(UUID actorId, ConsentRequestStatus status) {
         return repository.searchScoped(actorId, status).stream().map(row -> new ConsentRequestSummary(
                 row.requestId(), row.requestCode(), row.recipientId(), row.status(), row.expiresAt(),
-                row.createdAt(), row.versionNo())).toList();
+                row.createdAt(), row.versionNo(),row.templateVersionId())).toList();
     }
 
     @Transactional(readOnly = true)
     public List<ConsentRequestSummary> searchByRecipient(UUID actorId, UUID recipientId) {
         return repository.searchScopedByRecipient(actorId, recipientId).stream().map(row -> new ConsentRequestSummary(
                 row.requestId(), row.requestCode(), row.recipientId(), row.status(), row.expiresAt(),
-                row.createdAt(), row.versionNo())).toList();
+                row.createdAt(), row.versionNo(),row.templateVersionId())).toList();
     }
 
     @Transactional(readOnly = true)
@@ -38,7 +38,7 @@ public class ConsentRequestQueryService {
         int safePage=Math.max(1,page),safeSize=Math.max(1,Math.min(100,size)),offset=(safePage-1)*safeSize;
         String normalized = query == null || query.isBlank() ? null : query.strip();
         var rows=repository.searchScoped(actorId,status,normalized,safeSize+1,offset).stream().map(row -> new ConsentRequestSummary(
-                row.requestId(),row.requestCode(),row.recipientId(),row.status(),row.expiresAt(),row.createdAt(),row.versionNo())).toList();
+                row.requestId(),row.requestCode(),row.recipientId(),row.status(),row.expiresAt(),row.createdAt(),row.versionNo(),row.templateVersionId())).toList();
         return kr.or.arte.seal.common.web.AdminPageResult.of(rows,safePage,safeSize);
     }
 

@@ -35,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(RecipientController.class)
 @Import(SecurityConfig.class)
 class RecipientControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
     private static final UUID RECIPIENT_ID = UUID.fromString("40000000-0000-0000-0000-000000000001");
     private static final UUID ORG_ID = UUID.fromString("40000000-0000-0000-0000-000000000002");
     private static final UUID INSTITUTION_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

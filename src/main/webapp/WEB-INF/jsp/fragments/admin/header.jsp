@@ -19,4 +19,4 @@
         </form>
     </div>
 </header>
-<script defer src="${pageContext.request.contextPath}/resources/js/admin-ui.js?v=20260908-1"></script>
+<script defer src="${pageContext.request.contextPath}/resources/js/admin-ui.js?v=20260929-1"></script>

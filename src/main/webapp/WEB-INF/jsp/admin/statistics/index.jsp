@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/admin-data.css?v=20260908-1">
     <link rel="stylesheet" href="${pageContext.request.contextPath}/resources/css/statistics.css?v=20260908-3">
     <script defer src="${pageContext.request.contextPath}/resources/js/statistics.js?v=20260828-2"></script>
+    <script defer src="${pageContext.request.contextPath}/resources/js/template-download.js?v=20260929-1"></script>
 </head>
 <body class="admin-body">
 <jsp:include page="/WEB-INF/jsp/fragments/admin/header.jsp"/>
@@ -32,15 +33,16 @@
                 <label for="to"><span>종료일</span><input id="to" type="date" name="to" value="${to}"></label>
                 <button class="secondary-button">조회</button>
                 <sec:authorize access="hasAuthority('STATISTICS_VIEW') and hasAuthority('CONSENT_REQUEST_VIEW') and hasAuthority('RECIPIENT_VIEW') and hasAuthority('MAIL_VIEW') and hasAuthority('EVIDENCE_VIEW') and hasAuthority('RIGHTS_VIEW') and hasAuthority('RETENTION_VIEW')">
-                    <button class="secondary-button excel-download-button statistics-export-button" type="submit" data-download formaction="${pageContext.request.contextPath}/admin/statistics/export">
+                    <button class="secondary-button excel-download-button statistics-export-button" type="submit" data-download data-template-download data-download-filename="seal-statistics.xlsx" formaction="${pageContext.request.contextPath}/admin/statistics/export">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                             <path d="M14 3H5a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10M14 3l5 5h-5V3Z"/>
                             <path d="M7 10h4M7 14h4M7 18h4M19 12v8m-3-3 3 3 3-3"/>
                         </svg>
-                        <span>엑셀 다운로드</span>
+                        <span data-download-label>엑셀 다운로드</span>
                     </button>
                 </sec:authorize>
             </form>
+            <p class="field-hint" role="status" data-download-status></p>
             <p class="statistics-period-note"><strong>기간 기준</strong> 요청·메일·증적·권리요청·파기는 각 업무의 생성 또는 요청 시각,
                 응답은 제출 시각을 기준으로 집계합니다. 철회·증적 검증은 해당 사건 발생 시각 기준이며, 종료일 전체를 포함합니다.</p>
             <c:set var="groups" value="${[statistics.requests(),statistics.responses(),statistics.mail(),statistics.evidence(),statistics.rights(),statistics.retention()]}"/>

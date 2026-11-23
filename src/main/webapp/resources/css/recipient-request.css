@@ -235,6 +235,15 @@
     height: 50px;
     min-height: 50px;
 }
+.expiry-field .expiry-picker-controls [aria-invalid="true"] {
+    border-color: #bd3038;
+    background: #fff8f8;
+    box-shadow: 0 0 0 1px rgba(189, 48, 56, .14);
+}
+.expiry-field .expiry-picker-controls [aria-invalid="true"]:focus {
+    outline: 3px solid rgba(189, 48, 56, .16);
+    border-color: #a3262d;
+}
 .expiry-quick-actions {
     display: flex;
     align-items: center;

@@ -35,9 +35,9 @@ class EvidenceQueryServiceTest {
                 "CR-20260828-ABCDEFGH", "개인정보 수집·이용 동의 안내", recipientId,
                 2, 3, EvidenceGenerationStatus.FINALIZED, queuedAt, finalizedAt, 1, null);
         when(repository.search(actorId, null, 21, 0)).thenReturn(List.of(summary));
-        when(recipients.find(actorId, recipientId)).thenReturn(new RecipientDetail(recipientId,
+        when(recipients.findMany(actorId, List.of(recipientId))).thenReturn(java.util.Map.of(recipientId,new RecipientDetail(recipientId,
                 organizationId, "한국문화예술교육진흥원", "과장", "고*현", "v********@a******.kr",
-                "교육 신청서", RecipientStatus.ACTIVE, 0));
+                "교육 신청서", RecipientStatus.ACTIVE, 0)));
         EvidenceQueryService service = new EvidenceQueryService(repository, evidenceRoot.toString(),
                 "", "v1", Clock.fixed(queuedAt, ZoneOffset.UTC), mock(AuditEventWriter.class), recipients);
 
@@ -48,5 +48,6 @@ class EvidenceQueryServiceTest {
         assertThat(item.maskedName()).isEqualTo("고*현");
         assertThat(item.maskedEmail()).isEqualTo("v********@a******.kr");
         assertThat(item.responseSummary()).isEqualTo("일부 미동의");
+        org.mockito.Mockito.verify(recipients,org.mockito.Mockito.never()).find(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
     }
 }

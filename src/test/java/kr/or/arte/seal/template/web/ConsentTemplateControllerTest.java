@@ -46,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(ConsentTemplateController.class)
 @Import({SecurityConfig.class, TemplateWebExceptionHandler.class})
 class ConsentTemplateControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
 
     private static final UUID TEMPLATE_ID = UUID.fromString("31000000-0000-0000-0000-000000000001");
     private static final UUID ACTIVITY_VERSION_ID = UUID.fromString("32000000-0000-0000-0000-000000000001");

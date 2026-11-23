@@ -17,6 +17,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RecipientQueryServiceTest {
+    @Test void emailPageStopsDecryptingAfterFindingThePageAndNextRow() {
+        var rows=java.util.stream.IntStream.range(0,250).mapToObj(i->active(UUID.randomUUID(),"기관","담당자")).toList();
+        var cipher=org.mockito.Mockito.spy(cipherReturning("홍길동","user@example.com"));
+        var result=new RecipientQueryService(repositoryReturning(rows),cipher)
+                .searchPage(UUID.randomUUID(),"EXAMPLE",null,1,20);
+        assertThat(result.items()).hasSize(20);
+        assertThat(result.hasNext()).isTrue();
+        org.mockito.Mockito.verify(cipher,org.mockito.Mockito.times(42)).decrypt(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test void bulkPickerReturnsOnlyTheLimitPlusOneForTruncationDetection() {
+        var rows=java.util.stream.IntStream.range(0,1500).mapToObj(i->active(UUID.randomUUID(),"기관","담당자")).toList();
+        var result=new RecipientQueryService(repositoryReturning(rows),cipherReturning("홍길동","user@example.com"))
+                .searchPicker(UUID.randomUUID(),"example");
+        assertThat(result).hasSize(1001);
+    }
 
     @Test
     void blankPickerPageUsesRepositoryPagingWithoutLoadingEveryRecipient() {

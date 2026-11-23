@@ -40,7 +40,7 @@ public final class EvidenceWorker {
 
     private void process(EvidenceWorkItem item, Instant now) {
         try {
-            repository.finalized(item.packageId(), item.rowVersion(), generator.generate(item), now);
+            repository.generateAndFinalize(item, generator, now);
         } catch (EvidenceClaimLostException exception) {
             audit(item, "EVIDENCE_CLAIM_LOST", "FAILURE", "CLAIM_LOST", now);
             return;

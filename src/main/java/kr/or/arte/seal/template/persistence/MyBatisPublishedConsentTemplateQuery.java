@@ -51,6 +51,13 @@ public class MyBatisPublishedConsentTemplateQuery implements PublishedConsentTem
         return mapper.findPublishedOptions(actorId);
     }
 
+    @Override public java.util.Map<UUID,PublishedConsentTemplateOption> findVersionOptions(UUID actorId,List<UUID> versionIds) {
+        var ids=versionIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if(ids.isEmpty()) return java.util.Map.of();
+        if(ids.size()>1000) throw new IllegalArgumentException("양식 일괄 조회는 1,000개 이하여야 합니다.");
+        return mapper.findVersionOptions(actorId,ids).stream().collect(Collectors.toMap(PublishedConsentTemplateOption::templateVersionId,v->v));
+    }
+
     @Override
     public java.util.Optional<PublishedConsentTemplateOption> findVersionOption(
             UUID actorId, UUID templateVersionId) {

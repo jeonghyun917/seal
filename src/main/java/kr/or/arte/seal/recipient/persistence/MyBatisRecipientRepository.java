@@ -16,6 +16,10 @@ public class MyBatisRecipientRepository implements RecipientRepository {
 
     public MyBatisRecipientRepository(RecipientMapper mapper) { this.mapper = mapper; }
 
+    @Override public List<RecipientStoredRecord> findManyScoped(UUID actorId, List<UUID> ids) {
+        return ids.isEmpty() ? List.of() : mapper.findManyScoped(actorId, ids);
+    }
+
     @Override
     public boolean canAccessActiveOrganization(UUID actorId, UUID organizationId) {
         return mapper.canAccessActiveOrganization(actorId, organizationId);

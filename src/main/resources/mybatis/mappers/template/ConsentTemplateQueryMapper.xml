@@ -135,9 +135,9 @@
                             AND allowed.processing_activity_id=activity.processing_activity_id))
         ORDER BY template.template_code
     </select>
-    <select id="findVersionOption" resultType="kr.or.arte.seal.template.application.PublishedConsentTemplateOption">
+    <sql id="versionOptionQuery">
         <include refid="visibleScope"/>
-        SELECT version.consent_template_version_id AS template_version_id,
+        SELECT DISTINCT version.consent_template_version_id AS template_version_id,
                template.template_code, template.template_name,
                activity.activity_name, version.version_number
         FROM seal.consent_template_version version
@@ -147,10 +147,16 @@
           ON activity.processing_activity_id = template.processing_activity_id
         JOIN visible_scope scope
           ON scope.organization_unit_id = activity.owner_organization_unit_id
-        WHERE version.consent_template_version_id = #{templateVersionId}
-          AND (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
+        WHERE (NOT EXISTS (SELECT 1 FROM seal.user_processing_activity_scope configured
                            WHERE configured.admin_user_id = #{actorId})
                OR EXISTS (SELECT 1 FROM seal.user_processing_activity_scope allowed
                           WHERE allowed.admin_user_id = #{actorId}
                             AND allowed.processing_activity_id = activity.processing_activity_id))
+    </sql>
+    <select id="findVersionOption" resultType="kr.or.arte.seal.template.application.PublishedConsentTemplateOption">
+        <include refid="versionOptionQuery"/> AND version.consent_template_version_id=#{templateVersionId}
+    </select>
+    <select id="findVersionOptions" resultType="kr.or.arte.seal.template.application.PublishedConsentTemplateOption">
+        <include refid="versionOptionQuery"/> AND version.consent_template_version_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
     </select></mapper>

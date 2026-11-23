@@ -7,8 +7,9 @@ import java.time.*; import java.util.*;
 @Service public class ConsentSubmissionService {
  private final PublicConsentRepository repository;private final SecureLinkHasher hasher;private final AuditEventWriter audit;private final EvidenceQueue evidenceQueue;private final Clock clock;
  public ConsentSubmissionService(PublicConsentRepository r,SecureLinkHasher h,AuditEventWriter a,EvidenceQueue q,Clock c){repository=r;hasher=h;audit=a;evidenceQueue=q;clock=c;}
- @Transactional public ConsentSubmissionResult submit(String flowId,Map<UUID,ConsentDecision> decisions,UUID idempotencyKey){if(idempotencyKey==null)throw new IllegalArgumentException("제출 멱등키가 필요합니다.");Instant now=clock.instant();
-  var session=repository.findSessionForUpdateCandidates(hasher.candidates("flow:"+flowId),now).orElseThrow(()->new IllegalArgumentException("동의 세션이 만료되었습니다."));
+ @Transactional public ConsentSubmissionResult submit(String flowId,Map<UUID,ConsentDecision> decisions,UUID idempotencyKey){if(idempotencyKey==null)throw new IllegalArgumentException("제출 멱등키가 필요합니다.");
+  var session=repository.findSessionForUpdateCandidates(hasher.candidates("flow:"+flowId),clock.instant()).orElseThrow(()->new IllegalArgumentException("동의 세션이 만료되었습니다."));
+  Instant now=clock.instant();
   var previous=repository.findResponse(session.requestId(),idempotencyKey);if(previous.isPresent()){var p=previous.get();return new ConsentSubmissionResult(p.responseId(),p.status(),true,p.submittedAt());}
   if("ACTIVE".equals(session.sessionStatus())&&!session.expiresAt().isAfter(now))repository.expireSession(session.sessionId(),now);
   if(!"ACTIVE".equals(session.sessionStatus())||!session.expiresAt().isAfter(now)||session.requestStatus()!=ConsentRequestStatus.ACTIVE)throw new IllegalStateException("이미 완료되었거나 만료된 요청입니다.");

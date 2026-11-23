@@ -88,6 +88,9 @@ public class ConsentRequestManagementService implements ConsentRequestManagement
         if (command.recipientIds() == null || command.recipientIds().isEmpty()) {
             throw new IllegalArgumentException("동의 수신자를 한 명 이상 선택해 주세요.");
         }
+        if (command.recipientIds().size() > 1000) {
+            throw new IllegalArgumentException("한 번에 최대 1,000명까지 선택할 수 있습니다. 대상을 나누어 등록해 주세요.");
+        }
         var recipientIds = new LinkedHashSet<>(command.recipientIds());
         if (recipientIds.contains(null)) throw new IllegalArgumentException("동의 수신자 선택값이 올바르지 않습니다.");
         return recipientIds.stream().map(recipientId -> {

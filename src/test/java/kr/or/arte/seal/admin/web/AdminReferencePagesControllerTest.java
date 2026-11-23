@@ -35,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest({AdminUserController.class, RoleController.class, AuditEventController.class})
 @Import(SecurityConfig.class)
 class AdminReferencePagesControllerTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private kr.or.arte.seal.admin.config.AdminSessionGuard sessionGuard;
 
     @Autowired
     private MockMvc mockMvc;

@@ -11,6 +11,7 @@ import java.util.UUID;
 
 @Mapper
 public interface RecipientMapper {
+    List<RecipientStoredRecord> findManyScoped(@Param("actorId") UUID actorId, @Param("recipientIds") List<UUID> recipientIds);
     boolean canAccessActiveOrganization(@Param("actorId") UUID actorId,
                                         @Param("organizationId") UUID organizationId);
     List<RecipientStoredRecord> findActiveByEmailHmac(@Param("organizationId") UUID organizationId,

@@ -15,6 +15,9 @@ public interface RecipientRepository {
                                                            UUID excludedRecipientId);
     void insert(RecipientStoredRecord record, UUID actorId, Instant now);
     Optional<RecipientStoredRecord> findScoped(UUID actorId, UUID recipientId);
+    default List<RecipientStoredRecord> findManyScoped(UUID actorId, List<UUID> recipientIds) {
+        return recipientIds.stream().distinct().map(id -> findScoped(actorId,id)).flatMap(Optional::stream).toList();
+    }
     boolean update(RecipientStoredRecord record, UUID actorId, Instant now, long expectedVersion);
     List<RecipientStoredRecord> searchScoped(UUID actorId, String emailLookupHmac,
                                              RecipientStatus status);

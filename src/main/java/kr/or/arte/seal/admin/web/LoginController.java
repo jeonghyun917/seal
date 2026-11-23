@@ -14,6 +14,7 @@ public class LoginController {
             @RequestParam(required = false) String logout,
             @RequestParam(required = false) String passwordChanged,
             @RequestParam(required = false) String expired,
+            @RequestParam(required = false) String revoked,
             Model model
     ) {
         if (error != null) {
@@ -28,6 +29,10 @@ public class LoginController {
         }
         if (passwordChanged != null) {
             model.addAttribute("noticeMessage", "비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.");
+        }
+        if (revoked != null) {
+            model.addAttribute("errorMessage",
+                    "계정 또는 접근 권한이 변경되어 로그아웃되었습니다. 다시 로그인해 주세요.");
         }
         return "admin/login";
     }

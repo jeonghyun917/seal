@@ -59,8 +59,10 @@ public class RetentionJobService implements RetentionJobRequestPort {
         return require(actor, jobId).status() == RetentionJobStatus.CONFIRMED;
     }
 
+    @Transactional
     public void placeRestrictionHold(UUID request, UUID actor, Instant now) {
         if (request == null) throw new IllegalArgumentException("처리제한에는 동의요청 연결이 필요합니다.");
+        requireHoldAllowed(request);
         repository.placeRestrictionHold(UUID.randomUUID(), request, actor, now);
         audit.append(audit(now, actor, "RETENTION_RESTRICTION_HOLD", "CONSENT_REQUEST", request,
                 Map.of()));
@@ -85,6 +87,7 @@ public class RetentionJobService implements RetentionJobRequestPort {
             throw new IllegalArgumentException("보존 보류 만료일은 오늘보다 빠를 수 없습니다.");
         }
         Instant now = clock.instant();
+        requireHoldAllowed(request);
         repository.placeLegalHold(request, code, text, expiresOn, actor, now);
         audit.append(audit(now, actor, "LEGAL_HOLD_PLACE", "CONSENT_REQUEST", request,
                 Map.of("reasonCode", code, "hasExpiry", expiresOn != null)));
@@ -151,7 +154,11 @@ public class RetentionJobService implements RetentionJobRequestPort {
         }
         inTransaction(() -> {
             RetentionJobRecord current = lock(actor, id);
+            repository.lockRequest(current.consentRequestId());
             if (current.status() == RetentionJobStatus.APPROVED) {
+                RetentionJobTransition.requireNoHold(repository.hasActiveHold(
+                        current.consentRequestId(), LocalDate.now(clock)));
+                repository.invalidatePendingEvidence(current.consentRequestId(), clock.instant());
                 RetentionJobTransition.next(current.status(), RetentionJobStatus.EXECUTING);
                 repository.transition(id, current.status(), RetentionJobStatus.EXECUTING, actor, key, null,
                         clock.instant(), current.rowVersion());
@@ -223,6 +230,12 @@ public class RetentionJobService implements RetentionJobRequestPort {
         return repository.findScopedForUpdate(actor, id)
                 .orElseThrow(() -> new NoSuchElementException("파기 작업을 찾을 수 없습니다."));
 
+    }
+    private void requireHoldAllowed(UUID requestId) {
+        repository.lockRequest(requestId);
+        if (repository.hasStartedDestruction(requestId)) {
+            throw new IllegalStateException("파기가 시작되어 보존 보류를 등록할 수 없습니다.");
+        }
     }
     private <T> T inTransaction(Supplier<T> work) {
         if (transactions == null) return work.get();

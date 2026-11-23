@@ -50,7 +50,8 @@ public class DatabaseAuthenticationProvider implements AuthenticationProvider {
                 account.loginId(),
                 account.displayName(),
                 account.organizationUnitId(),
-                account.mustChangePassword()
+                account.mustChangePassword(),
+                AdminSessionGuard.stamp(account)
         );
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,

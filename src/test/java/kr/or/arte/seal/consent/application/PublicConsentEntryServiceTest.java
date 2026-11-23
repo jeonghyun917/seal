@@ -7,6 +7,15 @@ import java.security.SecureRandom; import java.time.*; import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PublicConsentEntryServiceTest {
+ @Test void flowCannotOutliveTheLinkDeadline(){
+  FakeRepository repo=new FakeRepository();byte[] key=new byte[32];Arrays.fill(key,(byte)3);
+  var hasher=new SecureLinkHasher(key);String token="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  Instant now=Instant.parse("2026-09-29T00:00:00Z"),deadline=now.plusSeconds(20);
+  repo.expectedHash=hasher.hmac(token);
+  repo.row=new PublicLinkRecord(UUID.randomUUID(),UUID.randomUUID(),SecureLinkStatus.ISSUED,deadline,ConsentRequestStatus.ACTIVE);
+  var service=new PublicConsentEntryService(repo,hasher,new SecureTokenGenerator(new SecureRandom()),Clock.fixed(now,ZoneOffset.UTC));
+  assertThat(service.start(token).expiresAt()).isEqualTo(deadline);
+ }
  @Test void inspectIsReadOnlyAndStartMarksAccessed(){
   FakeRepository repo=new FakeRepository(); byte[] key=new byte[32];Arrays.fill(key,(byte)3);
   String token="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";repo.row=new PublicLinkRecord(UUID.randomUUID(),UUID.randomUUID(),SecureLinkStatus.ISSUED,
